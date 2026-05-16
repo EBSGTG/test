@@ -134,9 +134,9 @@
             const cos3v = cosV * cosV * cosV;
             const sin3v = sinV * sinV * sinV;
 
-            const x = (R + r * cos3v) * Math.cos(u);
-            const y = (R + r * cos3v) * Math.sin(u);
-            const z = r * sin3v;
+            const x = (R + r * Math.cos(u)) * Math.cos(v);
+            const y = (R + r * Math.cos(u)) * Math.sin(v);
+            const z = r * Math.sin(u);
 
             verts.push(x, y, z);
           }
