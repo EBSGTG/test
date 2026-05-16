@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>AR – Astroidal Torus & Shoe Surface</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #000; }
+
+    #ui {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      z-index: 9999; display: flex; gap: 6px; flex-wrap: wrap;
+      justify-content: center; pointer-events: all; width: 100%;
+      padding: 0 8px;
+    }
+    .btn {
+      padding: 9px 16px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: bold; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn.active   { background: #4cff72; color: #000; }
+    .btn.inactive { background: rgba(255,255,255,0.88); color: #333; }
+    .btn.debug    { background: rgba(255,200,0,0.88);  color: #000; font-size: 12px; }
+
+    #status {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: #fff;
+      padding: 8px 18px; border-radius: 20px;
+      font-size: 13px; z-index: 9999; pointer-events: none;
+      text-align: center; max-width: 90vw;
+    }
+    #status.found { background: rgba(0,150,60,0.85); }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+</head>
+<body>
+
+<div id="ui">
+  <button class="btn active"   id="btnTorus" onclick="showSurface('torus')">Astroidal Torus</button>
+  <button class="btn inactive" id="btnShoe"  onclick="showSurface('shoe')">Shoe Surface</button>
+</div>
+<div id="status">Loading AR…</div>
+
+<!-- NOTE: patternRatio must match how the marker was generated.
+     AR.js default is 0.50. The generator tool typically produces 0.50 markers.
+     We use 0.50 here. -->
+<a-scene
+  id="arScene"
+  embedded
+  arjs="sourceType: webcam;
+        debugUIEnabled: false;
+        detectionMode: mono;
+        patternRatio: 0.50;"
+  renderer="antialias: true; logarithmicDepthBuffer: true;"
+  vr-mode-ui="enabled: false"
+  loading-screen="enabled: false"
+>
+
+  <a-light type="ambient"     color="#ffffff" intensity="0.6"></a-light>
+  <a-light type="directional" color="#ffffff" intensity="1.1" position="3 6 4"></a-light>
+  <a-light type="point"       color="#aaddff" intensity="0.45" position="-3 3 -2"></a-light>
+
+  <!-- ── YOUR custom marker ───────────────────────────────────────── -->
+  <a-marker
+    type="pattern"
+    url="pattern-astroidaltorus.patt"
+    id="mainMarker"
+    smooth="true" smoothCount="6" smoothTolerance="0.03" smoothThreshold="5"
+    emitevents="true"
+  >
+    <!-- Astroidal Torus -->
+    <a-entity id="torusEntity"
+      position="0 0.5 0"
+      surface-geometry="type: torus"
+      animation="property: rotation; to: 360 0 0; loop: true; dur: 5000; easing: linear">
+    </a-entity>
+
+    <!-- Shoe Surface -->
+    <a-entity id="shoeEntity"
+      position="0 0.5 0"
+      surface-geometry="type: shoe"
+      visible="false"
+      animation="property: rotation; to: 360 0 0; loop: true; dur: 5000; easing: linear">
+    </a-entity>
+  </a-marker>
+
+  <a-entity camera></a-entity>
+</a-scene>
+
+<!-- ═══════════════════════════════════════════ SCRIPTS ═════════════════ -->
+<script>
+'use strict';
+
+// ── Surface geometry component ──────────────────────────────────────────────
+AFRAME.registerComponent('surface-geometry', {
+  schema: { type: { type: 'string', default: 'torus' } },
+
+  init: function () {
+    const type  = this.data.type;
+    const geo   = type === 'torus' ? this.astroidalTorus() : this.shoeSurface();
+    const color = type === 'torus' ? 0x3a86ff : 0xff6b6b;
+
+    const mat = new THREE.MeshPhongMaterial({
+      color, specular: 0xffffff, shininess: 80,
+      side: THREE.DoubleSide, transparent: true, opacity: 0.92
+    });
+    this.el.setObject3D('mesh', new THREE.Mesh(geo, mat));
+    this.el.setObject3D('wireframe', new THREE.LineSegments(
+      new THREE.WireframeGeometry(geo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.20 })
+    ));
+  },
+
+  // x = (R + r·cos³v)·cos u,  y = (R + r·cos³v)·sin u,  z = r·sin³v
+  astroidalTorus: function () {
+    const R=1.0, r=0.40, uN=72, vN=72;
+    const pos=[], idx=[];
+    for (let i=0;i<=uN;i++) {
+      const u=(i/uN)*2*Math.PI, cu=Math.cos(u), su=Math.sin(u);
+      for (let j=0;j<=vN;j++) {
+        const v=(j/vN)*2*Math.PI, cv=Math.cos(v), sv=Math.sin(v);
+        const rho=R+r*cv*cv*cv;
+        pos.push(rho*cu, rho*su, r*sv*sv*sv);
+      }
+    }
+    for (let i=0;i<uN;i++) for (let j=0;j<vN;j++) {
+      const a=i*(vN+1)+j, b=a+1, c=(i+1)*(vN+1)+j, d=c+1;
+      idx.push(a,b,c, b,d,c);
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    g.setIndex(idx); g.computeVertexNormals(); return g;
+  },
+
+  // Enneper: x=u-u³/3+uv²,  y=v-v³/3+vu²,  z=u²-v²
+  shoeSurface: function () {
+    const uN=72, vN=72, s=0.42, lo=-1.3, hi=1.3;
+    const pos=[], idx=[];
+    for (let i=0;i<=uN;i++) {
+      const u=lo+(i/uN)*(hi-lo);
+      for (let j=0;j<=vN;j++) {
+        const v=lo+(j/vN)*(hi-lo);
+        pos.push(
+          s*(u-u*u*u/3+u*v*v),
+          s*(v-v*v*v/3+v*u*u),
+          s*(u*u-v*v)
+        );
+      }
+    }
+    for (let i=0;i<uN;i++) for (let j=0;j<vN;j++) {
+      const a=i*(vN+1)+j, b=a+1, c=(i+1)*(vN+1)+j, d=c+1;
+      idx.push(a,b,c, b,d,c);
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    g.setIndex(idx); g.computeVertexNormals(); return g;
+  }
+});
+
+// ── Status ──────────────────────────────────────────────────────────────────
+const statusEl = document.getElementById('status');
+
+document.querySelector('a-scene').addEventListener('loaded', () => {
+  statusEl.textContent = 'Ready — point camera at printed marker';
+});
+
+const marker = document.getElementById('mainMarker');
+let found = false;
+
+marker.addEventListener('markerFound', () => {
+  found = true;
+  statusEl.textContent = '✓ Marker detected!';
+  statusEl.classList.add('found');
+});
+marker.addEventListener('markerLost', () => {
+  found = false;
+  statusEl.textContent = 'Marker lost — keep it in view';
+  statusEl.classList.remove('found');
+});
+
+// ── Surface toggle ───────────────────────────────────────────────────────────
+function showSurface(type) {
+  document.getElementById('torusEntity').setAttribute('visible', type==='torus');
+  document.getElementById('shoeEntity').setAttribute('visible',  type==='shoe');
+  document.getElementById('btnTorus').className='btn '+(type==='torus'?'active':'inactive');
+  document.getElementById('btnShoe').className ='btn '+(type==='shoe' ?'active':'inactive');
+}
+</script>
+</body>
+</html>
