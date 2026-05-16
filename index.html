@@ -12,202 +12,264 @@
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink:       #FF69B4;
+      --pink-deep:  #FF1493;
+      --lavender:   #E6E6FA;
+      --violet:     #7B68EE;
+      --indigo:     #4B0082;
+      --sky:        #ADD8E6;
+      --bg:         #F8F8FF;
+      --white:      #FFFFFF;
+    }
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #F8F8FF;
-      color: #4B0082;
+      background: var(--bg);
+      color: var(--indigo);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ── TOP STRIP ── */
+    #top-strip {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: linear-gradient(135deg, #FFB6C1 0%, #E6E6FA 100%);
+      border-bottom: 3px solid var(--sky);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 1000;
+      pointer-events: none;
+      box-shadow: 0 2px 10px rgba(123,104,238,0.15);
+    }
+
+    .title-block {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .big-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--pink);
+      text-shadow: 1px 1px 2px rgba(255,105,180,0.3);
+      letter-spacing: 0.04em;
+    }
+
+    .formula-tag {
+      font-size: 11px;
+      color: var(--violet);
+      font-style: italic;
+      opacity: 0.85;
+      border-left: 2px solid var(--sky);
+      padding-left: 10px;
+    }
+    .formula-tag span { color: var(--indigo); font-weight: 600; }
+
+    /* status badge – mirrors tui-status-badge */
+    #state-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--white);
+      border: 1px solid var(--lavender);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--violet);
+      box-shadow: 0 2px 6px rgba(123,104,238,0.1);
+      pointer-events: none;
+    }
+
+    .tui-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--sky);
+      transition: background 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+    .tui-dot.connected  { background: #22c55e; box-shadow: 0 0 5px #22c55e88; }
+    .tui-dot.error      { background: #ef4444; box-shadow: 0 0 5px #ef444488; }
+
+    /* ── SIDE TICKER ── */
+    #side-ticker {
+      position: absolute;
+      top: 56px; left: 0; bottom: 130px;
+      width: 36px;
+      background: var(--lavender);
+      border-right: 2px dashed var(--sky);
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 1200px; width: 100%;
-      background: #FFFFFF;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(123,104,238,0.15);
-      overflow: hidden;
-    }
-
-    /* ── Header ── */
-    .header {
-      background: linear-gradient(135deg, #FFB6C1 0%, #E6E6FA 100%);
-      padding: 30px; text-align: center;
-      border-bottom: 3px solid #ADD8E6;
-    }
-    .header h2 { color: #FF69B4; margin-bottom: 10px; font-size: 2.5em; text-shadow: 1px 1px 2px rgba(255,105,180,0.4); }
-    .header p  { color: #7B68EE; font-size: 1.1em; opacity: 0.9; font-style: italic; }
-
-    .main-content { display: flex; flex-direction: column; align-items: center; padding: 30px; gap: 20px; }
-
-    /* ── AR Scene wrapper ── */
-    #ar-wrapper {
-      position: relative;
-      width: 100%;
-      border: 3px solid #ADD8E6;
-      box-shadow: 0 4px 15px rgba(123,104,238,0.2);
-      border-radius: 10px;
-      overflow: hidden;
-      background: #000;
-      aspect-ratio: 4/3;
-    }
-    #ar-wrapper:hover { box-shadow: 0 4px 20px rgba(255,105,180,0.5); }
-
-    a-scene {
-      position: absolute !important;
-      top: 0; left: 0; width: 100% !important; height: 100% !important;
-    }
-
-    /* ── Marker status badge overlay ── */
-    #marker-overlay {
-      position: absolute;
-      top: 12px; right: 12px;
-      display: flex; align-items: center; gap: 7px;
-      background: rgba(255,255,255,0.92);
-      border: 1px solid #E6E6FA;
-      padding: 5px 14px; border-radius: 20px;
-      font-size: 0.85em; color: #7B68EE;
-      box-shadow: 0 2px 6px rgba(123,104,238,0.1);
-      z-index: 10;
+      justify-content: center;
+      gap: 24px;
+      z-index: 999;
       pointer-events: none;
     }
-    .marker-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: #ADD8E6;
-      transition: background 0.3s, box-shadow 0.3s;
-    }
-    .marker-dot.found { background: #22c55e; box-shadow: 0 0 5px #22c55e88; }
-    .marker-dot.lost  { background: #ef4444; box-shadow: 0 0 5px #ef444488; }
 
-    /* ── Panels ── */
-    .tui-panel {
-      background: #F0F8FF;
-      border-radius: 15px;
-      padding: 25px;
-      width: 100%;
-      box-shadow: 0 5px 15px rgba(123,104,238,0.1);
-      border: 2px dashed #ADD8E6;
+    #side-ticker span {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--violet);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      text-transform: uppercase;
     }
-    .tui-panel-header {
-      display: flex; align-items: center; gap: 14px;
-      margin-bottom: 20px; padding-bottom: 14px;
-      border-bottom: 2px solid #ADD8E6;
+    #side-ticker .live {
+      color: var(--pink);
+      animation: blink 2.2s step-end infinite;
     }
-    .tui-icon {
-      width: 42px; height: 42px; border-radius: 10px;
-      background: #E6E6FA; border: 1px solid #ADD8E6;
-      display: flex; align-items: center; justify-content: center;
-      color: #FF69B4; flex-shrink: 0;
-    }
-    .tui-title    { color: #FF69B4; font-size: 1.5em; font-weight: 700; }
-    .tui-subtitle { color: #7B68EE; font-size: 0.85em; margin-top: 2px; opacity: 0.85; }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
 
-    /* ── Button grid ── */
-    .btn-grid {
+    /* corner brackets – matching header accent color */
+    .corner {
+      position: absolute;
+      width: 20px; height: 20px;
+      z-index: 1001;
+      pointer-events: none;
+    }
+    .corner.tl { top: 60px; left: 40px; border-top: 2px solid var(--pink); border-left: 2px solid var(--pink); }
+    .corner.tr { top: 60px; right: 4px;  border-top: 2px solid var(--pink); border-right: 2px solid var(--pink); }
+
+    /* ── AR SCENE AREA ── */
+    #ar-wrap {
+      position: absolute;
+      top: 56px; left: 36px; right: 0; bottom: 130px;
+    }
+
+    /* ── BOTTOM PANEL ── */
+    #bottom-panel {
+      position: absolute;
+      bottom: 0; left: 36px; right: 0;
+      height: 130px;
+      background: var(--white);
+      border-top: 3px solid var(--sky);
+      box-shadow: 0 -4px 15px rgba(123,104,238,0.12);
+      display: grid;
+      grid-template-columns: 1fr auto;
+    }
+
+    #btn-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      border: 1px solid #E6E6FA;
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 20px;
+      border-right: 1px solid var(--lavender);
     }
 
     .ctrl-cell {
-      display: flex; flex-direction: column;
-      border-right: 1px solid #E6E6FA;
-      border-bottom: 1px solid #E6E6FA;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--lavender);
+      border-bottom: 1px solid var(--lavender);
     }
     .ctrl-cell:nth-child(3n) { border-right: none; }
-    .ctrl-cell:nth-child(4), .ctrl-cell:nth-child(5), .ctrl-cell:nth-child(6) { border-bottom: none; }
 
     .ctrl-label {
-      font-size: 0.72em; letter-spacing: 0.1em;
-      text-transform: uppercase; color: #ADD8E6;
-      padding: 6px 10px 2px; font-weight: 600;
-      border-bottom: 1px solid #E6E6FA;
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--violet);
+      padding: 5px 10px 2px;
+      border-bottom: 1px solid var(--lavender);
+      font-weight: 600;
     }
 
     .ctrl-btn {
-      flex: 1; background: transparent; border: none;
-      color: #4B0082; font-family: inherit;
-      font-size: 13px; padding: 10px 12px;
-      cursor: pointer; text-align: left;
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--indigo);
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      padding: 6px 10px;
+      cursor: pointer;
+      text-align: left;
       transition: background 0.15s, color 0.15s;
-      display: flex; align-items: center; justify-content: space-between;
+      position: relative;
     }
-    .ctrl-btn::after { content: '▶'; font-size: 8px; color: #ADD8E6; transition: color 0.15s; }
-    .ctrl-btn:hover { background: #E6E6FA; color: #7B68EE; }
-    .ctrl-btn:hover::after { color: #7B68EE; }
-    .ctrl-btn.on { color: #FF69B4; background: #FFF0F5; }
-    .ctrl-btn.on::after { color: #FF69B4; }
+    .ctrl-btn::after {
+      content: '▶';
+      position: absolute;
+      right: 8px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 7px;
+      color: var(--sky);
+      transition: color 0.15s;
+    }
+    .ctrl-btn:hover {
+      background: var(--lavender);
+      color: var(--pink);
+    }
+    .ctrl-btn:hover::after { color: var(--pink); }
+    .ctrl-btn.on {
+      color: var(--pink);
+      background: rgba(255,105,180,0.07);
+    }
+    .ctrl-btn.on::after { color: var(--pink); }
 
-    /* ── Readout cards ── */
-    .readout-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-      gap: 10px;
+    /* ── READOUT – mirrors value-badge ── */
+    #readout {
+      width: 110px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      justify-content: center;
+      background: #F0F8FF;
     }
-    .readout-card {
-      background: #FFFFFF; border: 1px solid #E6E6FA;
-      border-radius: 10px; padding: 10px 14px;
-      display: flex; flex-direction: column; gap: 4px;
+    .readout-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    .readout-key { font-size: 0.72em; color: #ADD8E6; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-    .readout-val { font-size: 1.1em; color: #4B0082; font-weight: 700; }
-    .readout-val.hi { color: #FF69B4; }
+    .readout-key {
+      font-size: 8px;
+      color: var(--violet);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .readout-val {
+      font-size: 11px;
+      color: var(--indigo);
+      font-variant-numeric: tabular-nums;
+      background: var(--lavender);
+      color: var(--violet);
+      padding: 2px 8px;
+      border-radius: 20px;
+      border: 1px solid var(--sky);
+      font-weight: 600;
+    }
+    .readout-val.hi { background: rgba(255,105,180,0.12); color: var(--pink); border-color: rgba(255,105,180,0.4); }
 
-    /* ── Sliders ── */
-    .panel-title {
-      color: #FF69B4; font-size: 1.5em;
-      margin-bottom: 20px; padding-bottom: 10px;
-      border-bottom: 2px solid #ADD8E6;
-      font-weight: 700;
-    }
-    .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap: 20px; }
-
-    .control-item {
-      background: #FFFFFF; padding: 15px; border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(255,105,180,0.1);
-      border: 1px solid #E6E6FA;
-    }
-    .control-label {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 10px; color: #4B0082; font-weight: 500;
-    }
-    .value-badge {
-      background: #E6E6FA; color: #7B68EE;
-      padding: 3px 10px; border-radius: 20px;
-      font-size: 0.9em; font-weight: 600; border: 1px solid #ADD8E6;
-    }
-
-    input[type="range"] {
-      width: 100%; height: 8px; border-radius: 5px;
-      background: #E6E6FA; outline: none; -webkit-appearance: none;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 20px; height: 20px;
-      background: #FF69B4; border-radius: 50%; cursor: pointer;
-      box-shadow: 0 2px 5px rgba(255,105,180,0.3);
-      transition: transform 0.2s; border: 2px solid #FFFFFF;
-    }
-    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); background: #FF1493; }
-
-    @media (max-width: 900px) {
-      .control-grid { grid-template-columns: 1fr; }
-      .btn-grid { grid-template-columns: repeat(2,1fr); }
-      .ctrl-cell:nth-child(3n) { border-right: 1px solid #E6E6FA; }
-      .ctrl-cell:nth-child(2n) { border-right: none; }
+    /* ── MOBILE ADJUSTMENTS ── */
+    @media (max-width: 600px) {
+      .big-title { font-size: 15px; }
+      .formula-tag { display: none; }
+      #side-ticker { width: 28px; }
+      #side-ticker span { font-size: 8px; }
+      #bottom-panel { left: 28px; height: 140px; }
+      #ar-wrap { left: 28px; bottom: 140px; }
+      .corner.tl { left: 32px; }
+      #readout { width: 90px; }
+      .ctrl-btn { font-size: 10px; }
     }
   </style>
 
   <script>
   document.addEventListener('DOMContentLoaded', function () {
 
-    /* ── shoe-surface component (unchanged logic) ── */
     AFRAME.registerComponent('shoe-surface', {
       schema: {
         sMin:      { type: 'number',  default: -1.4  },
@@ -217,7 +279,7 @@
         sSegs:     { type: 'number',  default: 60    },
         tSegs:     { type: 'number',  default: 60    },
         zScale:    { type: 'number',  default: 0.6   },
-        color:     { type: 'color',   default: '#c8f000' },
+        color:     { type: 'color',   default: '#FF69B4' },
         wireframe: { type: 'boolean', default: false }
       },
       init()  { this.build(); },
@@ -263,7 +325,6 @@
       remove() { if (this.mesh) this.el.removeObject3D('mesh'); }
     });
 
-    /* ── spin-axis component (unchanged logic) ── */
     AFRAME.registerComponent('spin-axis', {
       schema: {
         active: { type: 'boolean', default: true },
@@ -287,184 +348,142 @@
 </head>
 
 <body>
-<div class="container">
 
-  <div class="header">
-    <h2>Gross topology mesh — AR surface</h2>
-    <p>Z = S³/3 − T²/2 · AR marker tracking · Rotate, scale, wireframe controls</p>
+  <!-- TOP STRIP -->
+  <div id="top-strip">
+    <div class="title-block">
+      <div class="big-title">3D Gross Topology Mesh</div>
+      <div class="formula-tag">Z = <span>S³/3 − T²/2</span></div>
+    </div>
+    <div id="state-pill">
+      <div class="tui-dot" id="state-dot"></div>
+      <span id="state-text">Scanning</span>
+    </div>
   </div>
 
-  <div class="main-content">
-
-    <!-- ══ AR Scene ══ -->
-    <div id="ar-wrapper">
-      <div id="marker-overlay">
-        <span class="marker-dot" id="markerDot"></span>
-        <span id="markerStatus">Scanning</span>
-      </div>
-
-      <a-scene embedded vr-mode-ui="enabled: false;"
-        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
-
-        <a-light type="ambient"     color="#ffffff"  intensity="0.5"></a-light>
-        <a-light type="directional" position="2 3 1" color="#e8f8c0" intensity="1.0"></a-light>
-        <a-light type="point"       position="-1 1 -2" color="#00aaff" intensity="0.35"></a-light>
-
-        <a-marker type="pattern" preset="custom"
-                  url="./markers/pattern-Gross-TopologyMesh.patt"
-                  id="marker">
-          <a-entity id="surf"
-            position="0 0.15 0"
-            scale="0.55 0.55 0.55"
-            shoe-surface="sMin:-1.4; sMax:1.4; tMin:-1.0; tMax:1.0; sSegs:60; tSegs:60; zScale:0.6; color:#c8f000; wireframe:false"
-            spin-axis="active:true; rate:0.35; axes:y">
-          </a-entity>
-        </a-marker>
-
-        <a-entity camera></a-entity>
-      </a-scene>
-    </div>
-
-    <!-- ══ Mesh controls panel ══ -->
-    <div class="tui-panel">
-      <div class="tui-panel-header">
-        <div class="tui-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-          </svg>
-        </div>
-        <div>
-          <div class="tui-title">Mesh controls</div>
-          <div class="tui-subtitle">Render mode · Palette · Rotation · Scale · Speed · Density</div>
-        </div>
-      </div>
-
-      <div class="btn-grid">
-        <div class="ctrl-cell">
-          <div class="ctrl-label">Render</div>
-          <button class="ctrl-btn" id="btn-wire">Wireframe</button>
-        </div>
-        <div class="ctrl-cell">
-          <div class="ctrl-label">Palette</div>
-          <button class="ctrl-btn" id="btn-color">Acid green</button>
-        </div>
-        <div class="ctrl-cell">
-          <div class="ctrl-label">Rotation</div>
-          <button class="ctrl-btn on" id="btn-axes">Axis — Y</button>
-        </div>
-        <div class="ctrl-cell">
-          <div class="ctrl-label">Scale</div>
-          <button class="ctrl-btn" id="btn-size">Size — M</button>
-        </div>
-        <div class="ctrl-cell">
-          <div class="ctrl-label">Velocity</div>
-          <button class="ctrl-btn on" id="btn-speed">Rate 0.35</button>
-        </div>
-        <div class="ctrl-cell">
-          <div class="ctrl-label">Density</div>
-          <button class="ctrl-btn" id="btn-detail">Mesh — M</button>
-        </div>
-      </div>
-
-      <div class="readout-grid">
-        <div class="readout-card"><span class="readout-key">Segs</span><span class="readout-val hi" id="ro-segs">60</span></div>
-        <div class="readout-card"><span class="readout-key">Rate</span><span class="readout-val" id="ro-rate">0.35</span></div>
-        <div class="readout-card"><span class="readout-key">Axis</span><span class="readout-val" id="ro-axis">Y</span></div>
-        <div class="readout-card"><span class="readout-key">Scale</span><span class="readout-val" id="ro-scale">0.55</span></div>
-        <div class="readout-card"><span class="readout-key">Mode</span><span class="readout-val" id="ro-mode">Solid</span></div>
-      </div>
-    </div>
-
-    <!-- ══ Surface parameter sliders ══ -->
-    <div class="tui-panel">
-      <div class="panel-title">Surface parameters</div>
-      <div class="control-grid">
-
-        <div class="control-item">
-          <div class="control-label">
-            <label>Z scale</label>
-            <span class="value-badge" id="v-zs">0.6</span>
-          </div>
-          <input type="range" min="0.1" max="1.5" step="0.1" value="0.6"
-            oninput="
-              document.getElementById('v-zs').textContent=parseFloat(this.value).toFixed(1);
-              document.getElementById('surf').setAttribute('shoe-surface','zScale',this.value);
-            ">
-        </div>
-
-        <div class="control-item">
-          <div class="control-label">
-            <label>S range (±)</label>
-            <span class="value-badge" id="v-sr">1.4</span>
-          </div>
-          <input type="range" min="0.5" max="2.5" step="0.1" value="1.4"
-            oninput="
-              document.getElementById('v-sr').textContent=parseFloat(this.value).toFixed(1);
-              document.getElementById('surf').setAttribute('shoe-surface','sMin',-this.value);
-              document.getElementById('surf').setAttribute('shoe-surface','sMax',this.value);
-            ">
-        </div>
-
-        <div class="control-item">
-          <div class="control-label">
-            <label>T range (±)</label>
-            <span class="value-badge" id="v-tr">1.0</span>
-          </div>
-          <input type="range" min="0.5" max="2.0" step="0.1" value="1.0"
-            oninput="
-              document.getElementById('v-tr').textContent=parseFloat(this.value).toFixed(1);
-              document.getElementById('surf').setAttribute('shoe-surface','tMin',-this.value);
-              document.getElementById('surf').setAttribute('shoe-surface','tMax',this.value);
-            ">
-        </div>
-
-        <div class="control-item">
-          <div class="control-label">
-            <label>Spin rate</label>
-            <span class="value-badge" id="v-spin">0.35</span>
-          </div>
-          <input type="range" min="0" max="1.5" step="0.05" value="0.35"
-            oninput="
-              const v=parseFloat(this.value);
-              document.getElementById('v-spin').textContent=v.toFixed(2);
-              document.getElementById('ro-rate').textContent=v.toFixed(2);
-              const s=document.getElementById('surf');
-              if(v===0){s.setAttribute('spin-axis','active',false);}
-              else{s.setAttribute('spin-axis','active',true);s.setAttribute('spin-axis','rate',v);}
-            ">
-        </div>
-
-      </div>
-    </div>
-
+  <!-- SIDE TICKER -->
+  <div id="side-ticker">
+    <span class="live">Live</span>
+    <span>AR</span>
+    <span>3D</span>
+    <span>Mesh</span>
   </div>
-</div>
 
-<script>
+  <!-- CORNER BRACKETS -->
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+
+  <!-- AR SCENE -->
+  <div id="ar-wrap">
+    <a-scene embedded vr-mode-ui="enabled: false;"
+      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+      style="width:100%;height:100%;">
+
+      <a-light type="ambient"     color="#ffffff"  intensity="0.5"></a-light>
+      <a-light type="directional" position="2 3 1" color="#FFB6C1" intensity="1.0"></a-light>
+      <a-light type="point"       position="-1 1 -2" color="#ADD8E6" intensity="0.45"></a-light>
+
+      <a-marker type="pattern" preset="custom"
+                url="./markers/pattern-Gross-TopologyMesh.patt"
+                id="marker">
+
+        <a-entity id="surf"
+          position="0 0.15 0"
+          scale="0.55 0.55 0.55"
+          shoe-surface="sMin:-1.4; sMax:1.4; tMin:-1.0; tMax:1.0; sSegs:60; tSegs:60; zScale:0.6; color:#FF69B4; wireframe:false"
+          spin-axis="active:true; rate:0.35; axes:y">
+        </a-entity>
+
+      </a-marker>
+      <a-entity camera></a-entity>
+    </a-scene>
+  </div>
+
+  <!-- BOTTOM PANEL -->
+  <div id="bottom-panel">
+    <div id="btn-grid">
+
+      <div class="ctrl-cell">
+        <div class="ctrl-label">Render</div>
+        <button class="ctrl-btn" id="btn-wire">Wireframe</button>
+      </div>
+
+      <div class="ctrl-cell">
+        <div class="ctrl-label">Palette</div>
+        <button class="ctrl-btn" id="btn-color">Lavender Pink</button>
+      </div>
+
+      <div class="ctrl-cell">
+        <div class="ctrl-label">Rotation</div>
+        <button class="ctrl-btn on" id="btn-axes">Axis — Y</button>
+      </div>
+
+      <div class="ctrl-cell">
+        <div class="ctrl-label">Scale</div>
+        <button class="ctrl-btn" id="btn-size">Size — M</button>
+      </div>
+
+      <div class="ctrl-cell">
+        <div class="ctrl-label">Velocity</div>
+        <button class="ctrl-btn on" id="btn-speed">Rate 0.35</button>
+      </div>
+
+      <div class="ctrl-cell">
+        <div class="ctrl-label">Density</div>
+        <button class="ctrl-btn" id="btn-detail">Mesh — M</button>
+      </div>
+
+    </div>
+
+    <div id="readout">
+      <div class="readout-row">
+        <span class="readout-key">Segs</span>
+        <span class="readout-val hi" id="ro-segs">60</span>
+      </div>
+      <div class="readout-row">
+        <span class="readout-key">Rate</span>
+        <span class="readout-val" id="ro-rate">0.35</span>
+      </div>
+      <div class="readout-row">
+        <span class="readout-key">Axis</span>
+        <span class="readout-val" id="ro-axis">Y</span>
+      </div>
+      <div class="readout-row">
+        <span class="readout-key">Scale</span>
+        <span class="readout-val" id="ro-scale">0.55</span>
+      </div>
+      <div class="readout-row">
+        <span class="readout-key">Mode</span>
+        <span class="readout-val" id="ro-mode">Solid</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
   document.addEventListener('DOMContentLoaded', function () {
     const marker = document.getElementById('marker');
     const surf   = document.getElementById('surf');
-    const dot    = document.getElementById('markerDot');
-    const txt    = document.getElementById('markerStatus');
+    const dot    = document.getElementById('state-dot');
+    const txt    = document.getElementById('state-text');
 
     marker.addEventListener('markerFound', () => {
-      dot.className = 'marker-dot found';
+      dot.className = 'tui-dot connected';
       txt.textContent = 'Locked';
     });
     marker.addEventListener('markerLost', () => {
-      dot.className = 'marker-dot lost';
+      dot.className = 'tui-dot error';
       txt.textContent = 'Lost';
     });
 
-    let wire = false, colorIdx = 0, axIdx = 0, sizeIdx = 0, speedIdx = 0, detailIdx = 0;
+    let wire=false, colorIdx=0, axIdx=0, sizeIdx=0, speedIdx=0, detailIdx=0;
 
     const palette = [
-      { label: 'Acid green',  hex: '#c8f000' },
-      { label: 'Signal red',  hex: '#ff2200' },
-      { label: 'Ice blue',    hex: '#00cfff' },
-      { label: 'Magma',       hex: '#ff6600' },
-      { label: 'Ghost',       hex: '#e0e0e0' },
-      { label: 'Ultraviolet', hex: '#9900ff' },
+      { label:'Lavender Pink', hex:'#FF69B4' },
+      { label:'Violet',        hex:'#7B68EE' },
+      { label:'Sky Blue',      hex:'#ADD8E6' },
+      { label:'Deep Pink',     hex:'#FF1493' },
+      { label:'Lavender',      hex:'#9370DB' },
+      { label:'Rose',          hex:'#FFB6C1' },
     ];
 
     const axList = [
@@ -476,7 +495,7 @@
       {s:'0.55 0.55 0.55',l:'M', v:'0.55'},
       {s:'0.35 0.35 0.35',l:'S', v:'0.35'},
       {s:'0.75 0.75 0.75',l:'L', v:'0.75'},
-      {s:'1.0 1.0 1.0',   l:'XL',v:'1.00'},
+      {s:'1.0 1.0 1.0',  l:'XL',v:'1.00'},
     ];
 
     const speeds = [
@@ -488,59 +507,61 @@
       {segs:60,l:'M'},{segs:25,l:'Lo'},{segs:100,l:'Hi'},
     ];
 
+    const ro = id => document.getElementById(id);
+
     document.getElementById('btn-wire').addEventListener('click', function () {
       wire = !wire;
       surf.setAttribute('shoe-surface','wireframe',wire);
       this.textContent = wire ? 'Solid' : 'Wireframe';
       this.classList.toggle('on', wire);
-      document.getElementById('ro-mode').textContent = wire ? 'Wire' : 'Solid';
+      ro('ro-mode').textContent = wire ? 'Wire' : 'Solid';
     });
 
     document.getElementById('btn-color').addEventListener('click', function () {
-      colorIdx = (colorIdx + 1) % palette.length;
-      surf.setAttribute('shoe-surface','color', palette[colorIdx].hex);
+      colorIdx = (colorIdx+1) % palette.length;
+      surf.setAttribute('shoe-surface','color',palette[colorIdx].hex);
       this.textContent = palette[colorIdx].label;
     });
 
     document.getElementById('btn-axes').addEventListener('click', function () {
-      axIdx = (axIdx + 1) % axList.length;
-      surf.setAttribute('spin-axis','axes', axList[axIdx].k);
-      this.textContent = 'Axis — ' + axList[axIdx].l;
-      document.getElementById('ro-axis').textContent = axList[axIdx].l;
+      axIdx = (axIdx+1) % axList.length;
+      surf.setAttribute('spin-axis','axes',axList[axIdx].k);
+      this.textContent = 'Axis — '+axList[axIdx].l;
+      ro('ro-axis').textContent = axList[axIdx].l;
     });
 
     document.getElementById('btn-size').addEventListener('click', function () {
-      sizeIdx = (sizeIdx + 1) % sizes.length;
-      surf.setAttribute('scale', sizes[sizeIdx].s);
-      this.textContent = 'Size — ' + sizes[sizeIdx].l;
-      document.getElementById('ro-scale').textContent = sizes[sizeIdx].v;
+      sizeIdx = (sizeIdx+1) % sizes.length;
+      surf.setAttribute('scale',sizes[sizeIdx].s);
+      this.textContent = 'Size — '+sizes[sizeIdx].l;
+      ro('ro-scale').textContent = sizes[sizeIdx].v;
     });
 
     document.getElementById('btn-speed').addEventListener('click', function () {
-      speedIdx = (speedIdx + 1) % speeds.length;
+      speedIdx = (speedIdx+1) % speeds.length;
       const sp = speeds[speedIdx];
-      if (sp.r === 0) {
-        surf.setAttribute('spin-axis','active', false);
+      if (sp.r===0) {
+        surf.setAttribute('spin-axis','active',false);
         this.classList.remove('on');
       } else {
-        surf.setAttribute('spin-axis','active', true);
-        surf.setAttribute('spin-axis','rate', sp.r);
+        surf.setAttribute('spin-axis','active',true);
+        surf.setAttribute('spin-axis','rate',sp.r);
         this.classList.add('on');
       }
-      this.textContent = 'Rate ' + sp.l;
-      document.getElementById('ro-rate').textContent = sp.l;
+      this.textContent = 'Rate '+sp.l;
+      ro('ro-rate').textContent = sp.l;
     });
 
     document.getElementById('btn-detail').addEventListener('click', function () {
-      detailIdx = (detailIdx + 1) % details.length;
+      detailIdx = (detailIdx+1) % details.length;
       const d = details[detailIdx];
-      surf.setAttribute('shoe-surface','sSegs', d.segs);
-      surf.setAttribute('shoe-surface','tSegs', d.segs);
-      this.textContent = 'Mesh — ' + d.l;
-      document.getElementById('ro-segs').textContent = d.segs;
+      surf.setAttribute('shoe-surface','sSegs',d.segs);
+      surf.setAttribute('shoe-surface','tSegs',d.segs);
+      this.textContent = 'Mesh — '+d.l;
+      ro('ro-segs').textContent = d.segs;
     });
   });
-</script>
+  </script>
 
 </body>
 </html>
