@@ -1,289 +1,344 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 <html>
 <head>
   <meta charset="UTF-8">
+  <title>The Toroidal Universe — AR</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>AR – Astroidal Torus & Shoe Surface</title>
+
+  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.3.0/dist/aframe-master.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
   <style>
-    body { margin:0; padding:0; overflow:hidden; font-family:Arial,sans-serif; }
-    .control-panel {
-      position:absolute; bottom:0; left:0; right:0;
-      background:rgba(0,0,0,0.75); color:#fff;
-      padding:10px; display:flex; flex-direction:column; z-index:9999;
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Georgia', serif;
+      background: #000;
     }
-    .control-row { display:flex; justify-content:center; margin:4px 0; flex-wrap:wrap; gap:5px; }
-    .btn {
-      background:#4CAF50; color:#fff; border:none; border-radius:5px;
-      padding:8px 12px; font-weight:bold; cursor:pointer;
-      min-width:75px; font-size:13px; -webkit-tap-highlight-color:transparent;
-    }
-    .btn.active  { background:#ff7f00; }
-    .btn.red     { background:#cc2200; }
-    .btn.blue    { background:#0055cc; }
+
+    /* ── Info panel ── */
     .info-panel {
-      position:absolute; top:0; left:0; right:0;
-      background:rgba(0,0,0,0.65); color:#fff;
-      padding:10px 14px; z-index:9999; font-size:14px;
-      text-align:center; transition:background 0.3s;
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      color: #e8d5a0;
+      padding: 6px 18px;
+      border-radius: 20px;
+      z-index: 999;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      border: 1px solid rgba(232,213,160,0.3);
+      white-space: nowrap;
+      transition: background 0.4s;
     }
-    @media(max-width:600px){ .btn{padding:6px 8px;min-width:60px;font-size:12px;} }
+    .info-panel.found  { background: rgba(0,80,40,0.65);  border-color: rgba(100,255,150,0.4); color: #90ffb8; }
+    .info-panel.lost   { background: rgba(80,0,0,0.65);   border-color: rgba(255,100,80,0.4);  color: #ffaa90; }
+
+    /* ── Control panel ── */
+    .control-panel {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(8,6,20,0.75);
+      color: #e8d5a0;
+      padding: 10px 6px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 999;
+      border-top: 1px solid rgba(232,213,160,0.15);
+      backdrop-filter: blur(6px);
+    }
+    .control-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: rgba(232,213,160,0.08);
+      color: #e8d5a0;
+      border: 1px solid rgba(232,213,160,0.35);
+      border-radius: 6px;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-family: 'Georgia', serif;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      min-width: 76px;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .btn:hover  { background: rgba(232,213,160,0.18); }
+    .btn.active { background: rgba(200,120,40,0.55); border-color: #c87830; color: #ffe8b0; }
+
+    @media (max-width: 480px) {
+      .btn { padding: 6px 8px; min-width: 66px; font-size: 11px; }
+    }
   </style>
 
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.3/aframe/build/aframe-ar.js"></script>
+  <script>
+  // ─────────────────────────────────────────────────────────────────
+  //  COMPONENT: toroidal-surface
+  //  Generates the "Toroidal Universe" shape:
+  //    a torus-like surface where z oscillates sinusoidally,
+  //    creating the pinched double-lobe visible in the marker image.
+  // ─────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+
+    AFRAME.registerComponent('toroidal-surface', {
+      schema: {
+        R:          { type: 'number',  default: 0.55  }, // major radius
+        r:          { type: 'number',  default: 0.28  }, // minor radius (tube)
+        amplitude:  { type: 'number',  default: 0.18  }, // z-pinch amplitude
+        frequency:  { type: 'number',  default: 2     }, // pinch cycles around φ
+        uSegs:      { type: 'number',  default: 80    }, // φ segments
+        vSegs:      { type: 'number',  default: 48    }, // θ segments
+        color:      { type: 'color',   default: '#ff7a30' },
+        wireframe:  { type: 'boolean', default: false }
+      },
+
+      init()  { this.build(); },
+
+      update(old) {
+        const d = this.data;
+        const keys = ['R','r','amplitude','frequency','uSegs','vSegs'];
+        if (keys.some(k => old[k] !== d[k])) {
+          this.el.removeObject3D('mesh');
+          this.build();
+        } else if (this.mesh) {
+          if (old.color     !== d.color)     this.mesh.material.color.set(d.color);
+          if (old.wireframe !== d.wireframe) this.mesh.material.wireframe = d.wireframe;
+        }
+      },
+
+      build() {
+        const { R, r, amplitude, frequency, uSegs, vSegs } = this.data;
+        const geo = new THREE.BufferGeometry();
+        const verts = [], idx = [], cols = vSegs + 1;
+
+        for (let ui = 0; ui <= uSegs; ui++) {
+          const phi = (ui / uSegs) * 2 * Math.PI;          // around torus
+          const pinch = 1 - amplitude * Math.abs(Math.cos(frequency * phi));
+
+          for (let vi = 0; vi <= vSegs; vi++) {
+            const theta = (vi / vSegs) * 2 * Math.PI;       // around tube
+
+            // Standard torus with radial pinch on minor radius
+            const rr = r * pinch;
+            const x = (R + rr * Math.cos(theta)) * Math.cos(phi);
+            const y = (R + rr * Math.cos(theta)) * Math.sin(phi);
+            const z = rr * Math.sin(theta);
+
+            verts.push(x, y, z);
+          }
+        }
+
+        for (let ui = 0; ui < uSegs; ui++) {
+          for (let vi = 0; vi < vSegs; vi++) {
+            const a = ui * cols + vi;
+            const b = a + 1;
+            const c = a + cols;
+            const d2 = c + 1;
+            idx.push(a, b, c);
+            idx.push(b, d2, c);
+          }
+        }
+
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.setIndex(idx);
+        geo.computeVertexNormals();
+
+        const mat = new THREE.MeshStandardMaterial({
+          color:     this.data.color,
+          side:      THREE.DoubleSide,
+          wireframe: this.data.wireframe,
+          metalness: 0.3,
+          roughness: 0.5
+        });
+
+        this.mesh = new THREE.Mesh(geo, mat);
+        this.el.setObject3D('mesh', this.mesh);
+      },
+
+      remove() { if (this.mesh) this.el.removeObject3D('mesh'); }
+    });
+
+    // ── multi-axis-rotation (unchanged logic) ──
+    AFRAME.registerComponent('multi-axis-rotation', {
+      schema: {
+        enabled: { type: 'boolean', default: true },
+        speed:   { type: 'number',  default: 0.4  },
+        mode:    { type: 'string',  default: 'y'  }
+      },
+      init() { this.rot = { x:0, y:0, z:0 }; },
+      tick(time, dt) {
+        if (!this.data.enabled) return;
+        const s = this.data.speed, d = dt / 1000, m = this.data.mode;
+        if (m.includes('x')) this.rot.x += d * s;
+        if (m.includes('y')) this.rot.y += d * s;
+        if (m.includes('z')) this.rot.z += d * s;
+        this.el.object3D.rotation.set(this.rot.x, this.rot.y, this.rot.z);
+      }
+    });
+
+  }); // end DOMContentLoaded
+  </script>
 </head>
+
 <body>
 
-<div class="info-panel" id="info">Завантаження…</div>
+  <!-- ── Status ── -->
+  <div class="info-panel" id="info">🔭 Шукаю маркер…</div>
 
-<div class="control-panel">
-  <div class="control-row">
-    <button class="btn active"  id="btn-surface">Тор</button>
-    <button class="btn"         id="btn-wireframe">Каркас: Вим</button>
-    <button class="btn"         id="btn-color">Колір</button>
-    <button class="btn red"     id="btn-ratio">ratio: 0.50</button>
+  <!-- ── Controls ── -->
+  <div class="control-panel">
+    <div class="control-row">
+      <button class="btn" id="btn-wireframe">Каркас</button>
+      <button class="btn" id="btn-color">Колір</button>
+      <button class="btn" id="btn-axis">Вісь: Y</button>
+    </div>
+    <div class="control-row">
+      <button class="btn" id="btn-size">Розмір</button>
+      <button class="btn active" id="btn-speed">Швид: 0.4</button>
+      <button class="btn" id="btn-detail">Деталі: M</button>
+    </div>
   </div>
-  <div class="control-row">
-    <button class="btn active"  id="btn-axis">Вісь: Y</button>
-    <button class="btn active"  id="btn-size">Розмір: 1.0</button>
-    <button class="btn active"  id="btn-speed">Швид: 0.3</button>
-    <button class="btn blue"    id="btn-marker">Маркер: МІЙ</button>
-  </div>
-</div>
 
-<div id="ar-root"></div>
+  <!-- ── A-Frame scene ── -->
+  <a-scene embedded vr-mode-ui="enabled: false;"
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
 
-<script>
-'use strict';
+    <!-- Lights -->
+    <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
+    <a-light type="directional" position="1 2 1" intensity="1.0" color="#ffe8c0"></a-light>
+    <a-light type="point" position="-1 1 -1" intensity="0.4" color="#8080ff"></a-light>
 
-const PATT_DATA = "255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255   0 255 255 255 255 255 255   0 255 255 255 255\n255 255 255   0 255 255 255 255 255 255 255 255   0 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   2 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255   0 255 255 194 255 255 255 255 255 255 255 255 255   0 255\n255   0 255 255 137 255 255 255 255 255 255 255 255 255   0 255\n255 250 255 255 255 104 255 255 255 255   0 255 255 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   0 255 255\n255 255 255  38 255 255 255 255 255 255 255 255   0 255 255 255\n255 255 255 255  33 255 255 255 255 255 255   0 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255   0 255 255 255 255 255 255   0 255 255 255 255\n255 255 255   0 255 255 255 255 255 255 255 255   0 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   2 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255   0 255 255 194 255 255 255 255 255 255 255 255 255   0 255\n255   0 255 255 137 255 255 255 255 255 255 255 255 255   0 255\n255 250 255 255 255 104 255 255 255 255   0 255 255 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   0 255 255\n255 255 255  38 255 255 255 255 255 255 255 255   0 255 255 255\n255 255 255 255  33 255 255 255 255 255 255   0 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255   0 255 255 255 255 255 255   0 255 255 255 255\n255 255 255   0 255 255 255 255 255 255 255 255   0 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   2 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255   0 255 255 194 255 255 255 255 255 255 255 255 255   0 255\n255   0 255 255 137 255 255 255 255 255 255 255 255 255   0 255\n255 250 255 255 255 104 255 255 255 255   0 255 255 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   0 255 255\n255 255 255  38 255 255 255 255 255 255 255 255   0 255 255 255\n255 255 255 255  33 255 255 255 255 255 255   0 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255   2 255 255 255 255   0 255 255 255 255 255\n255 255 255 255   0 255 255 255 255 255 255   0 255 255 255 255\n255 255 255   0 255 255 255 255 255 255 255 255   0 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   0 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255   0 255 255 255 255 255 255 255 255 255 255 255 255   0 255\n255   0 255 255 255 255 255 255 255 255 255 255 255 255   0 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255   0 255 255 255   0 255 255 104 255 255 255   0 255 255\n255 255 255   0 255 255 255 194 137 255 255 255  33 255 255 255\n255 255 255 255   0 255 255 255 255 255 255  38 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 250 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255   2 255 255 255 255   0 255 255 255 255 255\n255 255 255 255   0 255 255 255 255 255 255   0 255 255 255 255\n255 255 255   0 255 255 255 255 255 255 255 255   0 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   0 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255   0 255 255 255 255 255 255 255 255 255 255 255 255   0 255\n255   0 255 255 255 255 255 255 255 255 255 255 255 255   0 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255   0 255 255 255   0 255 255 104 255 255 255   0 255 255\n255 255 255   0 255 255 255 194 137 255 255 255  33 255 255 255\n255 255 255 255   0 255 255 255 255 255 255  38 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 250 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 255 255 255 255 255 255 255\n255 255 255 255 255   2 255 255 255 255   0 255 255 255 255 255\n255 255 255 255   0 255 255 255 255 255 255   0 255 255 255 255\n255 255 255   0 255 255 255 255 255 255 255 255   0 255 255 255\n255 255   0 255 255 255   0 255 255   0 255 255 255   0 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255   0 255 255 255 255 255 255 255 255 255 255 255 255   0 255\n255   0 255 255 255 255 255 255 255 255 255 255 255 255   0 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255   0 255 255 255   0 255 255 104 255 255 255   0 255 255\n255 255 255   0 255 255 255 194 137 255 255 255  33 255 255 255\n255 255 255 255   0 255 255 255 255 255 255  38 255 255 255 255\n255 255 255 255 255   0 255 255 255 255   0 255 255 255 255 255\n255 255 255 255 255 255 255   0   0 250 255 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n\n255 255 255 255 255 255 255 250 248 255 255 255 255 255 255 255\n255 255 255 255 255 242 159 133 126 150 235 255 255 255 255 255\n255 255 255 255 217 122 234 251 233 242 127 202 254 255 255 255\n255 255 255 206 133 254 255 251 233 255 254 152 189 254 255 255\n255 255 219 131 254 255 239 165 147 231 255 255 152 203 255 255\n255 245 123 253 255 220 107 248 252 124 203 255 255 125 235 255\n255 167 225 255 237 108 255 255 255 255 138 223 255 244 151 255\n255 128 233 233 167 248 255 255 255 255 254 143 233 233 126 249\n255 135 249 249 182 242 255 255 255 255 253 156 249 249 130 251\n255 177 212 255 243  99 254 255 255 255 113 232 255 235 158 255\n255 250 125 250 255 233 101 230 240 103 221 255 254 122 243 255\n255 255 232 121 253 255 247 189 172 242 255 254 133 217 255 255\n255 255 255 221 121 250 255 251 233 255 253 132 207 255 255 255\n255 255 255 255 231 127 210 251 233 226 122 219 255 255 255 255\n255 255 255 255 255 250 177 135 129 168 245 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 250 248 255 255 255 255 255 255 255\n255 255 255 255 255 242 159 133 126 150 235 255 255 255 255 255\n255 255 255 255 217 122 234 251 233 242 127 202 254 255 255 255\n255 255 255 206 133 254 255 251 233 255 254 152 189 254 255 255\n255 255 219 131 254 255 239 165 147 231 255 255 152 203 255 255\n255 245 123 253 255 220 107 248 252 124 203 255 255 125 235 255\n255 167 225 255 237 108 255 255 255 255 138 223 255 244 151 255\n255 128 233 233 167 248 255 255 255 255 254 143 233 233 126 249\n255 135 249 249 182 242 255 255 255 255 253 156 249 249 130 251\n255 177 212 255 243  99 254 255 255 255 113 232 255 235 158 255\n255 250 125 250 255 233 101 230 240 103 221 255 254 122 243 255\n255 255 232 121 253 255 247 189 172 242 255 254 133 217 255 255\n255 255 255 221 121 250 255 251 233 255 253 132 207 255 255 255\n255 255 255 255 231 127 210 251 233 226 122 219 255 255 255 255\n255 255 255 255 255 250 177 135 129 168 245 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 250 248 255 255 255 255 255 255 255\n255 255 255 255 255 242 159 133 126 150 235 255 255 255 255 255\n255 255 255 255 217 122 234 251 233 242 127 202 254 255 255 255\n255 255 255 206 133 254 255 251 233 255 254 152 189 254 255 255\n255 255 219 131 254 255 239 165 147 231 255 255 152 203 255 255\n255 245 123 253 255 220 107 248 252 124 203 255 255 125 235 255\n255 167 225 255 237 108 255 255 255 255 138 223 255 244 151 255\n255 128 233 233 167 248 255 255 255 255 254 143 233 233 126 249\n255 135 249 249 182 242 255 255 255 255 253 156 249 249 130 251\n255 177 212 255 243  99 254 255 255 255 113 232 255 235 158 255\n255 250 125 250 255 233 101 230 240 103 221 255 254 122 243 255\n255 255 232 121 253 255 247 189 172 242 255 254 133 217 255 255\n255 255 255 221 121 250 255 251 233 255 253 132 207 255 255 255\n255 255 255 255 231 127 210 251 233 226 122 219 255 255 255 255\n255 255 255 255 255 250 177 135 129 168 245 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n\n255 255 255 255 255 255 255 249 251 255 255 255 255 255 255 255\n255 255 255 255 255 235 151 126 130 158 243 255 255 255 255 255\n255 255 255 254 203 125 244 233 249 235 122 217 255 255 255 255\n255 255 254 189 152 255 255 233 249 255 254 133 207 255 255 255\n255 255 202 152 255 255 223 143 156 232 255 254 132 219 255 255\n255 235 127 254 255 203 138 254 253 113 221 255 253 122 245 255\n255 150 242 255 231 124 255 255 255 255 103 242 255 226 168 255\n248 126 233 233 147 252 255 255 255 255 240 172 233 233 129 255\n250 133 251 251 165 248 255 255 255 255 230 189 251 251 135 255\n255 159 234 255 239 107 255 255 255 254 101 247 255 210 177 255\n255 242 122 254 255 220 108 248 242  99 233 255 250 127 250 255\n255 255 217 133 254 255 237 167 182 243 255 253 121 231 255 255\n255 255 255 206 131 253 255 233 249 255 250 121 221 255 255 255\n255 255 255 255 219 123 225 233 249 212 125 232 255 255 255 255\n255 255 255 255 255 245 167 128 135 177 250 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 249 251 255 255 255 255 255 255 255\n255 255 255 255 255 235 151 126 130 158 243 255 255 255 255 255\n255 255 255 254 203 125 244 233 249 235 122 217 255 255 255 255\n255 255 254 189 152 255 255 233 249 255 254 133 207 255 255 255\n255 255 202 152 255 255 223 143 156 232 255 254 132 219 255 255\n255 235 127 254 255 203 138 254 253 113 221 255 253 122 245 255\n255 150 242 255 231 124 255 255 255 255 103 242 255 226 168 255\n248 126 233 233 147 252 255 255 255 255 240 172 233 233 129 255\n250 133 251 251 165 248 255 255 255 255 230 189 251 251 135 255\n255 159 234 255 239 107 255 255 255 254 101 247 255 210 177 255\n255 242 122 254 255 220 108 248 242  99 233 255 250 127 250 255\n255 255 217 133 254 255 237 167 182 243 255 253 121 231 255 255\n255 255 255 206 131 253 255 233 249 255 250 121 221 255 255 255\n255 255 255 255 219 123 225 233 249 212 125 232 255 255 255 255\n255 255 255 255 255 245 167 128 135 177 250 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n255 255 255 255 255 255 255 249 251 255 255 255 255 255 255 255\n255 255 255 255 255 235 151 126 130 158 243 255 255 255 255 255\n255 255 255 254 203 125 244 233 249 235 122 217 255 255 255 255\n255 255 254 189 152 255 255 233 249 255 254 133 207 255 255 255\n255 255 202 152 255 255 223 143 156 232 255 254 132 219 255 255\n255 235 127 254 255 203 138 254 253 113 221 255 253 122 245 255\n255 150 242 255 231 124 255 255 255 255 103 242 255 226 168 255\n248 126 233 233 147 252 255 255 255 255 240 172 233 233 129 255\n250 133 251 251 165 248 255 255 255 255 230 189 251 251 135 255\n255 159 234 255 239 107 255 255 255 254 101 247 255 210 177 255\n255 242 122 254 255 220 108 248 242  99 233 255 250 127 250 255\n255 255 217 133 254 255 237 167 182 243 255 253 121 231 255 255\n255 255 255 206 131 253 255 233 249 255 250 121 221 255 255 255\n255 255 255 255 219 123 225 233 249 212 125 232 255 255 255 255\n255 255 255 255 255 245 167 128 135 177 250 255 255 255 255 255\n255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255\n";
+    <a-marker type="pattern" preset="custom"
+              url="./markers/pattern-The-Toroidal-Universe.patt"
+              id="marker">
 
-// All ratios to try
-const RATIOS  = [0.50, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85];
-let ratioIdx  = 0;
-let useHiro   = false;   // toggle between custom and Hiro marker
+      <!-- Toroidal surface -->
+      <a-entity id="torus"
+        position="0 0.4 0"
+        scale="0.9 0.9 0.9"
+        toroidal-surface="R:0.55; r:0.28; amplitude:0.18; frequency:2; uSegs:80; vSegs:48; color:#ff7a30; wireframe:false"
+        multi-axis-rotation="enabled:true; speed:0.4; mode:y">
+      </a-entity>
 
-/* ── Build / rebuild entire a-scene ────────────────────────────────── */
-function buildScene() {
-  const ratio   = RATIOS[ratioIdx];
-  const pattURL = URL.createObjectURL(new Blob([PATT_DATA], {type:'text/plain'}));
+    </a-marker>
 
-  document.getElementById('ar-root').innerHTML = '';   // destroy old scene
+    <a-entity camera></a-entity>
+  </a-scene>
 
-  const markerAttr = useHiro
-    ? `preset="hiro"`
-    : `type="pattern" url="${pattURL}"`;
+  <!-- ── App logic ── -->
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const marker   = document.getElementById('marker');
+    const torus    = document.getElementById('torus');
+    const info     = document.getElementById('info');
 
-  document.getElementById('ar-root').innerHTML = `
-<a-scene embedded vr-mode-ui="enabled:false"
-  arjs="sourceType:webcam; debugUIEnabled:false; detectionMode:mono; patternRatio:${ratio}; maxDetectionRate:60;"
-  renderer="antialias:true;" id="arscene">
-
-  <a-light type="ambient"     color="#fff" intensity="0.7"></a-light>
-  <a-light type="directional" color="#fff" intensity="1.1" position="5 10 5"></a-light>
-
-  <a-marker ${markerAttr}
-    id="marker" smooth="true" smoothCount="5" smoothTolerance="0.05" emitevents="true">
-
-    <a-entity id="surface" position="0 0.5 0"
-      surface-geometry="type:torus"
-      multi-axis-rotation="enabled:true; speed:0.3; mode:y">
-    </a-entity>
-
-  </a-marker>
-  <a-entity camera></a-entity>
-</a-scene>`;
-
-  // Update UI labels
-  document.getElementById('btn-ratio').textContent  = 'ratio: ' + ratio;
-  document.getElementById('btn-marker').textContent = useHiro ? 'Маркер: HIRO' : 'Маркер: МІЙ';
-  document.getElementById('info').textContent       = 'Шукаю маркер… ratio=' + ratio + (useHiro ? ' [HIRO]' : '');
-  document.getElementById('info').style.background  = 'rgba(0,0,0,0.65)';
-
-  setTimeout(wireMarker, 1000);
-}
-
-function wireMarker() {
-  const marker = document.getElementById('marker');
-  const info   = document.getElementById('info');
-  if (!marker) { setTimeout(wireMarker, 300); return; }
-  marker.addEventListener('markerFound', () => {
-    info.textContent = '✅ ЗНАЙДЕНО! ratio=' + RATIOS[ratioIdx] + (useHiro ? ' [HIRO]' : '');
-    info.style.background = 'rgba(0,150,0,0.85)';
-  });
-  marker.addEventListener('markerLost', () => {
-    info.textContent = 'Шукаю маркер… ratio=' + RATIOS[ratioIdx] + (useHiro ? ' [HIRO]' : '');
-    info.style.background = 'rgba(0,0,0,0.65)';
-  });
-  initButtons();
-}
-
-/* ── A-Frame components ─────────────────────────────────────────────── */
-AFRAME.registerComponent('surface-geometry', {
-  schema: { type:{type:'string', default:'torus'} },
-  init:   function(){ this._color='#2277ff'; this._wire=false; this._build(); },
-  update: function(old){ if(old.type!==this.data.type) this._build(); },
-
-  _build: function(){
-    const geo = this.data.type==='torus' ? this._torus() : this._shoe();
-    const mat = new THREE.MeshPhongMaterial({
-      color:this._color, specular:0xffffff, shininess:80,
-      side:THREE.DoubleSide, transparent:true, opacity:0.9,
-      wireframe:this._wire
+    // ── Marker events ──
+    marker.addEventListener('markerFound', () => {
+      info.textContent = '✨ Маркер знайдено!';
+      info.className = 'info-panel found';
     });
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.el.setObject3D('mesh', this.mesh);
-  },
+    marker.addEventListener('markerLost', () => {
+      info.textContent = '🔭 Маркер втрачено…';
+      info.className = 'info-panel lost';
+    });
 
-  setColor:     function(c){ this._color=c; if(this.mesh) this.mesh.material.color.set(c); },
-  setWireframe: function(v){ this._wire=v;  if(this.mesh) this.mesh.material.wireframe=v;  },
+    // ── State ──
+    let wireframe = false;
+    let colorIdx  = 0;
+    let modeIdx   = 0;
+    let sizeIdx   = 0;
+    let speedIdx  = 0;
+    let detailIdx = 0;
 
-  /* Astroidal Torus: x=(R+r·cos³v)·cosu, y=(R+r·cos³v)·sinu, z=r·sin³v */
-  _torus: function(){
-    const R=1.0,r=0.38,UN=72,VN=72,pos=[],idx=[];
-    for(let i=0;i<=UN;i++){
-      const u=(i/UN)*2*Math.PI,cu=Math.cos(u),su=Math.sin(u);
-      for(let j=0;j<=VN;j++){
-        const v=(j/VN)*2*Math.PI,cv=Math.cos(v),sv=Math.sin(v);
-        const rho=R+r*cv*cv*cv;
-        pos.push(rho*cu,rho*su,r*sv*sv*sv);
+    const colors = [
+      { label: 'Вогонь',  surface: '#ff7a30' },
+      { label: 'Лазур',   surface: '#30c8ff' },
+      { label: 'Нефрит',  surface: '#40ff90' },
+      { label: 'Аметист', surface: '#b060ff' },
+      { label: 'Золото',  surface: '#ffd060' },
+      { label: 'Рожевий', surface: '#ff60a0' }
+    ];
+
+    const modes = ['y','x','z','xy','xz','yz','xyz'];
+
+    const sizes = [
+      { s: '0.9 0.9 0.9', label: 'M' },
+      { s: '0.6 0.6 0.6', label: 'S' },
+      { s: '1.2 1.2 1.2', label: 'L' },
+      { s: '1.5 1.5 1.5', label: 'XL'}
+    ];
+
+    const speeds = [0.4, 0.1, 0.7, 1.2, 0.0];
+
+    const details = [
+      { label: 'M',  uSegs: 80,  vSegs: 48 },
+      { label: 'Lo', uSegs: 30,  vSegs: 20 },
+      { label: 'Hi', uSegs: 120, vSegs: 72 }
+    ];
+
+    // ── Wireframe ──
+    document.getElementById('btn-wireframe').addEventListener('click', function() {
+      wireframe = !wireframe;
+      torus.setAttribute('toroidal-surface', 'wireframe', wireframe);
+      this.classList.toggle('active', wireframe);
+    });
+
+    // ── Color ──
+    document.getElementById('btn-color').addEventListener('click', function() {
+      colorIdx = (colorIdx + 1) % colors.length;
+      torus.setAttribute('toroidal-surface', 'color', colors[colorIdx].surface);
+      this.textContent = colors[colorIdx].label;
+    });
+
+    // ── Axis ──
+    document.getElementById('btn-axis').addEventListener('click', function() {
+      modeIdx = (modeIdx + 1) % modes.length;
+      torus.setAttribute('multi-axis-rotation', 'mode', modes[modeIdx]);
+      this.textContent = 'Вісь: ' + modes[modeIdx].toUpperCase();
+    });
+
+    // ── Size ──
+    document.getElementById('btn-size').addEventListener('click', function() {
+      sizeIdx = (sizeIdx + 1) % sizes.length;
+      torus.setAttribute('scale', sizes[sizeIdx].s);
+      this.textContent = 'Розмір: ' + sizes[sizeIdx].label;
+    });
+
+    // ── Speed (single click cycle, double-click pause) ──
+    const btnSpeed = document.getElementById('btn-speed');
+    btnSpeed.addEventListener('click', function() {
+      speedIdx = (speedIdx + 1) % speeds.length;
+      const sp = speeds[speedIdx];
+      if (sp === 0.0) {
+        torus.setAttribute('multi-axis-rotation', 'enabled', false);
+        this.textContent = 'Стоп';
+        this.classList.remove('active');
+      } else {
+        torus.setAttribute('multi-axis-rotation', 'enabled', true);
+        torus.setAttribute('multi-axis-rotation', 'speed', sp);
+        this.textContent = 'Швид: ' + sp.toFixed(1);
+        this.classList.add('active');
       }
-    }
-    for(let i=0;i<UN;i++) for(let j=0;j<VN;j++){
-      const a=i*(VN+1)+j,b=a+1,c=(i+1)*(VN+1)+j,d=c+1;
-      idx.push(a,b,c,b,d,c);
-    }
-    const g=new THREE.BufferGeometry();
-    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-    g.setIndex(idx); g.computeVertexNormals(); return g;
-  },
+    });
 
-  /* Shoe/Enneper: x=u-u³/3+uv², y=v-v³/3+vu², z=u²-v² */
-  _shoe: function(){
-    const UN=72,VN=72,S=0.42,LO=-1.3,HI=1.3,pos=[],idx=[];
-    for(let i=0;i<=UN;i++){
-      const u=LO+(i/UN)*(HI-LO);
-      for(let j=0;j<=VN;j++){
-        const v=LO+(j/VN)*(HI-LO);
-        pos.push(S*(u-u*u*u/3+u*v*v),S*(v-v*v*v/3+v*u*u),S*(u*u-v*v));
-      }
-    }
-    for(let i=0;i<UN;i++) for(let j=0;j<VN;j++){
-      const a=i*(VN+1)+j,b=a+1,c=(i+1)*(VN+1)+j,d=c+1;
-      idx.push(a,b,c,b,d,c);
-    }
-    const g=new THREE.BufferGeometry();
-    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-    g.setIndex(idx); g.computeVertexNormals(); return g;
-  }
-});
+    // ── Detail ──
+    document.getElementById('btn-detail').addEventListener('click', function() {
+      detailIdx = (detailIdx + 1) % details.length;
+      const d = details[detailIdx];
+      torus.setAttribute('toroidal-surface', 'uSegs', d.uSegs);
+      torus.setAttribute('toroidal-surface', 'vSegs', d.vSegs);
+      this.textContent = 'Деталі: ' + d.label;
+    });
+  });
+  </script>
 
-AFRAME.registerComponent('multi-axis-rotation', {
-  schema:{
-    enabled:{type:'boolean',default:true},
-    speed:{type:'number',default:0.3},
-    mode:{type:'string',default:'y'}
-  },
-  init:function(){this.rx=0;this.ry=0;this.rz=0;},
-  tick:function(t,dt){
-    if(!this.data.enabled)return;
-    const s=this.data.speed*(dt/1000),m=this.data.mode;
-    if(m.includes('x'))this.rx+=s;
-    if(m.includes('y'))this.ry+=s;
-    if(m.includes('z'))this.rz+=s;
-    this.el.object3D.rotation.set(this.rx,this.ry,this.rz);
-  }
-});
-
-/* ── UI buttons — re-wired after each scene rebuild ─────────────────── */
-let buttonsInited = false;
-function initButtons(){
-  if(buttonsInited) return;
-  buttonsInited = true;
-
-  /* ratio — rebuild scene */
-  document.getElementById('btn-ratio').onclick = function(){
-    ratioIdx = (ratioIdx+1) % RATIOS.length;
-    buttonsInited = false;
-    buildScene();
-  };
-
-  /* marker type — rebuild scene */
-  document.getElementById('btn-marker').onclick = function(){
-    useHiro = !useHiro;
-    buttonsInited = false;
-    buildScene();
-  };
-
-  /* Surface */
-  const surfs=[{type:'torus',label:'Тор',color:'#2277ff'},{type:'shoe',label:'Shoe',color:'#ff4444'}];
-  let sIdx=0;
-  document.getElementById('btn-surface').onclick = function(){
-    sIdx=(sIdx+1)%surfs.length;
-    const se=document.getElementById('surface');
-    se.setAttribute('surface-geometry','type',surfs[sIdx].type);
-    setTimeout(()=>{ if(se.components['surface-geometry']) se.components['surface-geometry']._color=surfs[sIdx].color; },300);
-    this.textContent=surfs[sIdx].label;
-  };
-
-  /* Wireframe */
-  let wireOn=false;
-  document.getElementById('btn-wireframe').onclick = function(){
-    wireOn=!wireOn;
-    const comp=document.getElementById('surface').components['surface-geometry'];
-    if(comp) comp.setWireframe(wireOn);
-    this.textContent=wireOn?'Каркас: Вкл':'Каркас: Вим';
-    this.classList.toggle('active',wireOn);
-  };
-
-  /* Color */
-  const colors=['#2277ff','#ff4444','#44cc44','#ffcc00','#ff44ff','#00cccc'];
-  let cIdx=0;
-  document.getElementById('btn-color').onclick = function(){
-    cIdx=(cIdx+1)%colors.length;
-    const comp=document.getElementById('surface').components['surface-geometry'];
-    if(comp) comp.setColor(colors[cIdx]);
-    this.style.background=colors[cIdx];
-  };
-
-  /* Axis */
-  const axes=[{m:'y',l:'Y'},{m:'x',l:'X'},{m:'z',l:'Z'},{m:'xy',l:'XY'},{m:'xz',l:'XZ'},{m:'yz',l:'YZ'},{m:'xyz',l:'XYZ'}];
-  let aIdx=0;
-  document.getElementById('btn-axis').onclick = function(){
-    aIdx=(aIdx+1)%axes.length;
-    document.getElementById('surface').setAttribute('multi-axis-rotation','mode',axes[aIdx].m);
-    this.textContent='Вісь: '+axes[aIdx].l;
-  };
-
-  /* Size */
-  const sizes=[1.0,0.6,1.4,0.35];
-  let szIdx=0;
-  document.getElementById('btn-size').onclick = function(){
-    szIdx=(szIdx+1)%sizes.length;
-    const s=sizes[szIdx];
-    document.getElementById('surface').setAttribute('scale',s+' '+s+' '+s);
-    this.textContent='Розмір: '+s;
-  };
-
-  /* Speed */
-  const speeds=[0.3,0.1,0.6,1.0];
-  let spIdx=0, running=true;
-  const btnSp=document.getElementById('btn-speed');
-  btnSp.onclick=function(){
-    spIdx=(spIdx+1)%speeds.length;
-    document.getElementById('surface').setAttribute('multi-axis-rotation','speed',speeds[spIdx]);
-    this.textContent='Швид: '+speeds[spIdx].toFixed(1);
-  };
-  btnSp.ondblclick=function(e){
-    e.preventDefault(); running=!running;
-    document.getElementById('surface').setAttribute('multi-axis-rotation','enabled',running);
-    this.textContent=running?'Швид: '+speeds[spIdx].toFixed(1):'Стоп';
-    this.classList.toggle('active',running);
-  };
-}
-
-/* ── Start ──────────────────────────────────────────────────────────── */
-buildScene();
-</script>
 </body>
 </html>
