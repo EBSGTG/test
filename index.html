@@ -1,461 +1,243 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>GROSS TOPOLOGY MESH — AR SURFACE</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  .p-root { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #F8F8FF; border-radius: 20px; overflow: hidden; border: 0.5px solid #E6E6FA; }
+  .p-header { background: #FFB6C1; padding: 20px 24px; text-align: center; border-bottom: 3px solid #ADD8E6; }
+  .p-header h2 { color: #FF69B4; font-size: 1.8em; font-weight: 700; margin-bottom: 4px; }
+  .p-header p  { color: #7B68EE; font-size: 0.9em; font-style: italic; opacity: 0.9; }
+  .p-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; background: #F8F8FF; }
 
-  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.3.0/dist/aframe-master.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  .p-canvas-wrap { border: 3px solid #ADD8E6; border-radius: 10px; overflow: hidden; background: #fff; margin-bottom: 4px; }
+  .p-canvas-inner { background: #FAFAFA; min-height: 180px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .p-canvas-label { position: absolute; top: 8px; left: 10px; font-size: 11px; color: #ADD8E6; letter-spacing: .06em; font-weight: 600; }
+  .p-canvas-grab  { position: absolute; bottom: 8px; right: 10px; font-size: 11px; color: #ADD8E6; font-style: italic; }
+  .p-canvas-ph    { font-size: 1.1em; color: #E6E6FA; font-weight: 600; letter-spacing: .1em; }
 
-  <style>
-    :root {
-      --ink:   #0d0d0d;
-      --paper: #f0ede6;
-      --acid:  #c8f000;
-      --rust:  #c84b00;
-      --steel: #8c8c8c;
-      --dim:   #2a2a2a;
-    }
+  .p-panel { background: #F0F8FF; border-radius: 15px; padding: 20px; border: 2px dashed #ADD8E6; }
+  .p-panel-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #ADD8E6; }
+  .p-icon { width: 40px; height: 40px; border-radius: 10px; background: #E6E6FA; border: 1px solid #ADD8E6; display: flex; align-items: center; justify-content: center; color: #FF69B4; flex-shrink: 0; }
+  .p-title    { color: #FF69B4; font-size: 1.2em; font-weight: 700; }
+  .p-subtitle { color: #7B68EE; font-size: 0.8em; opacity: 0.85; margin-top: 2px; }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  .p-status-badge { margin-left: auto; display: flex; align-items: center; gap: 7px; background: #fff; border: 1px solid #E6E6FA; padding: 4px 12px; border-radius: 20px; font-size: 0.8em; color: #7B68EE; }
+  .p-dot { width: 8px; height: 8px; border-radius: 50%; background: #ADD8E6; display: inline-block; transition: background .3s; }
+  .p-dot.connected { background: #22c55e; }
+  .p-dot.error     { background: #ef4444; }
 
-    body {
-      font-family: 'Space Mono', monospace;
-      background: var(--ink);
-      color: var(--paper);
-      overflow: hidden;
-      width: 100vw; height: 100vh;
-    }
+  .p-field-group { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .p-field { display: flex; flex-direction: column; gap: 5px; }
+  .p-field-label { color: #4B0082; font-size: 0.72em; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .p-field input[type=text], .p-field input[type=number] {
+    background: #fff; border: 1px solid #E6E6FA; color: #4B0082;
+    padding: 7px 11px; border-radius: 10px; font-size: 13px; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .p-field input:focus { border-color: #7B68EE; box-shadow: 0 0 0 3px rgba(123,104,238,.12); }
+  .p-field input[type=text]   { width: 130px; }
+  .p-field input[type=number] { width: 80px; }
 
-    /* TOP STRIP */
-    #top-strip {
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 48px;
-      background: var(--ink);
-      border-bottom: 2px solid var(--acid);
-      display: flex; align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      z-index: 1000;
-      pointer-events: none;
-    }
+  .p-actions { display: flex; gap: 7px; flex-wrap: wrap; align-items: flex-end; }
+  .p-btn { display: flex; align-items: center; gap: 5px; padding: 8px 16px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 12px; transition: transform .1s; }
+  .p-btn:active { transform: scale(.97); }
+  .btn-connect    { background: #FF69B4; color: #fff; }
+  .btn-connect:hover { background: #FF1493; }
+  .btn-disconnect { background: #E6E6FA; color: #7B68EE; }
+  .btn-disconnect:hover { background: #d8d8f5; }
+  .btn-reset      { background: #fff; color: #4B0082; border: 1px solid #E6E6FA; }
+  .btn-reset:hover { background: #f0f0ff; }
 
-    .title-block { display: flex; align-items: baseline; gap: 12px; }
+  .p-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 2px dashed #ADD8E6; border-radius: 15px; overflow: hidden; }
+  .p-ctrl-cell { display: flex; flex-direction: column; border-right: 1px solid #E6E6FA; border-bottom: 1px solid #E6E6FA; }
+  .p-ctrl-cell:nth-child(3n) { border-right: none; }
+  .p-ctrl-cell:nth-child(4), .p-ctrl-cell:nth-child(5), .p-ctrl-cell:nth-child(6) { border-bottom: none; }
+  .p-ctrl-label { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: #ADD8E6; padding: 6px 10px 3px; border-bottom: 1px solid #E6E6FA; font-weight: 600; }
+  .p-ctrl-btn { flex: 1; background: transparent; border: none; color: #4B0082; font-family: inherit; font-size: 11px; padding: 8px 10px; cursor: pointer; text-align: left; transition: background .15s, color .15s; display: flex; align-items: center; justify-content: space-between; }
+  .p-ctrl-btn:hover { background: #E6E6FA; color: #7B68EE; }
+  .p-ctrl-btn.on { color: #FF69B4; background: #FFF0F5; }
+  .p-ctrl-btn-arr { font-size: 8px; color: #ADD8E6; }
+  .p-ctrl-btn.on .p-ctrl-btn-arr { color: #FF69B4; }
 
-    .big-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 26px;
-      letter-spacing: 0.15em;
-      color: var(--acid);
-      line-height: 1;
-    }
+  .p-readout { padding: 16px 20px; background: #F0F8FF; border-top: 2px solid #ADD8E6; border-radius: 0 0 13px 13px; display: flex; gap: 20px; flex-wrap: wrap; }
+  .p-readout-item { display: flex; flex-direction: column; gap: 2px; }
+  .p-readout-key { font-size: 9px; color: #ADD8E6; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .p-readout-val { font-size: 13px; color: #4B0082; font-weight: 600; }
+  .p-readout-val.hi { color: #FF69B4; }
 
-    .formula-tag {
-      font-size: 10px; color: var(--steel);
-      letter-spacing: 0.1em;
-      border-left: 1px solid var(--steel);
-      padding-left: 10px;
-    }
-    .formula-tag span { color: var(--paper); }
+  .p-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .p-slider-label { font-size: 12px; color: #4B0082; font-weight: 500; width: 140px; flex-shrink: 0; }
+  .p-slider-val { background: #E6E6FA; color: #7B68EE; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #ADD8E6; min-width: 48px; text-align: center; flex-shrink: 0; }
+  input[type=range] { flex: 1; height: 8px; border-radius: 5px; background: #E6E6FA; outline: none; -webkit-appearance: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: #FF69B4; border-radius: 50%; border: 2px solid #fff; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb:hover { background: #FF1493; }
+</style>
 
-    #state-pill {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 10px; letter-spacing: 0.12em;
-      color: var(--steel); text-transform: uppercase;
-    }
+<div class="p-root">
 
-    #state-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--steel); flex-shrink: 0;
-      transition: background 0.4s, box-shadow 0.4s;
-    }
-    #state-dot.found { background: var(--acid); box-shadow: 0 0 8px var(--acid); }
-    #state-dot.lost  { background: var(--rust); box-shadow: 0 0 8px var(--rust); }
-    #state-text.found { color: var(--acid); }
-    #state-text.lost  { color: var(--rust); }
-
-    /* SIDE TICKER */
-    #side-ticker {
-      position: absolute;
-      top: 48px; left: 0; bottom: 0; width: 36px;
-      background: var(--dim); border-right: 1px solid #333;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 28px; z-index: 999; pointer-events: none;
-    }
-
-    #side-ticker span {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 11px; letter-spacing: 0.18em; color: #444;
-      writing-mode: vertical-rl; text-orientation: mixed;
-      transform: rotate(180deg);
-    }
-    #side-ticker .live { color: var(--acid); animation: blink 2.2s step-end infinite; }
-
-    @keyframes blink {
-      0%,100% { opacity:1; } 50% { opacity:0.2; }
-    }
-
-    /* CORNER BRACKETS */
-    .corner {
-      position: absolute; width: 20px; height: 20px;
-      z-index: 1001; pointer-events: none;
-    }
-    .corner.tl { top: 52px; left: 40px; border-top: 2px solid var(--rust); border-left: 2px solid var(--rust); }
-    .corner.tr { top: 52px; right: 4px;  border-top: 2px solid var(--rust); border-right: 2px solid var(--rust); }
-
-    /* BOTTOM PANEL */
-    #bottom-panel {
-      position: absolute;
-      bottom: 0; left: 36px; right: 0;
-      background: var(--ink);
-      border-top: 2px solid #333;
-      z-index: 1000;
-      display: grid;
-      grid-template-columns: 1fr auto;
-    }
-
-    #btn-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-right: 1px solid #222;
-    }
-
-    .ctrl-cell {
-      display: flex; flex-direction: column;
-      border-right: 1px solid #1e1e1e;
-      border-bottom: 1px solid #1e1e1e;
-    }
-    .ctrl-cell:nth-child(3n) { border-right: none; }
-
-    .ctrl-label {
-      font-size: 8px; letter-spacing: 0.14em;
-      text-transform: uppercase; color: #444;
-      padding: 6px 10px 2px;
-      border-bottom: 1px solid #1e1e1e;
-    }
-
-    .ctrl-btn {
-      flex: 1; background: transparent; border: none;
-      color: var(--paper); font-family: 'Space Mono', monospace;
-      font-size: 11px; letter-spacing: 0.06em;
-      padding: 8px 10px; cursor: pointer; text-align: left;
-      transition: background 0.15s, color 0.15s;
-      position: relative;
-    }
-    .ctrl-btn::after {
-      content: '▶'; position: absolute; right: 8px;
-      top: 50%; transform: translateY(-50%);
-      font-size: 7px; color: #333; transition: color 0.15s;
-    }
-    .ctrl-btn:hover { background: #1a1a1a; color: var(--acid); }
-    .ctrl-btn:hover::after { color: var(--acid); }
-    .ctrl-btn.on { color: var(--acid); background: rgba(200,240,0,0.06); }
-    .ctrl-btn.on::after { color: var(--acid); }
-
-    /* READOUT */
-    #readout {
-      width: 110px; padding: 10px 12px;
-      display: flex; flex-direction: column;
-      gap: 6px; justify-content: center;
-    }
-    .readout-row { display: flex; justify-content: space-between; align-items: center; }
-    .readout-key { font-size: 8px; color: #444; letter-spacing: 0.1em; text-transform: uppercase; }
-    .readout-val { font-size: 10px; color: var(--paper); font-variant-numeric: tabular-nums; }
-    .readout-val.hi { color: var(--acid); }
-  </style>
-
-  <script>
-  document.addEventListener('DOMContentLoaded', function () {
-
-    AFRAME.registerComponent('shoe-surface', {
-      schema: {
-        sMin:      { type: 'number',  default: -1.4  },
-        sMax:      { type: 'number',  default:  1.4  },
-        tMin:      { type: 'number',  default: -1.0  },
-        tMax:      { type: 'number',  default:  1.0  },
-        sSegs:     { type: 'number',  default: 60    },
-        tSegs:     { type: 'number',  default: 60    },
-        zScale:    { type: 'number',  default: 0.6   },
-        color:     { type: 'color',   default: '#c8f000' },
-        wireframe: { type: 'boolean', default: false }
-      },
-      init()  { this.build(); },
-      update(old) {
-        const geo = ['sMin','sMax','tMin','tMax','sSegs','tSegs','zScale'];
-        if (geo.some(k => old[k] !== this.data[k])) {
-          this.el.removeObject3D('mesh'); this.build();
-        } else if (this.mesh) {
-          if (old.color     !== this.data.color)     this.mesh.material.color.set(this.data.color);
-          if (old.wireframe !== this.data.wireframe) this.mesh.material.wireframe = this.data.wireframe;
-        }
-      },
-      vertex(s, t, zs) {
-        // z = s³/3 − t²/2
-        const z = (Math.pow(s, 3) / 3 - Math.pow(t, 2) / 2) * zs;
-        return [s, z, t];
-      },
-      build() {
-        const { sMin, sMax, tMin, tMax, sSegs, tSegs, zScale, color, wireframe } = this.data;
-        const pos = [], idx = [], cols = tSegs + 1;
-        for (let si = 0; si <= sSegs; si++) {
-          const s = sMin + (si / sSegs) * (sMax - sMin);
-          for (let ti = 0; ti <= tSegs; ti++) {
-            const t = tMin + (ti / tSegs) * (tMax - tMin);
-            pos.push(...this.vertex(s, t, zScale));
-          }
-        }
-        for (let si = 0; si < sSegs; si++) {
-          for (let ti = 0; ti < tSegs; ti++) {
-            const a = si*cols+ti, b=a+1, c=(si+1)*cols+ti, d=c+1;
-            idx.push(a,b,c, b,d,c);
-          }
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        geo.setIndex(idx);
-        geo.computeVertexNormals();
-        const mat = new THREE.MeshStandardMaterial({
-          color, side: THREE.DoubleSide, wireframe, metalness: 0.4, roughness: 0.4
-        });
-        this.mesh = new THREE.Mesh(geo, mat);
-        this.el.setObject3D('mesh', this.mesh);
-      },
-      remove() { if (this.mesh) this.el.removeObject3D('mesh'); }
-    });
-
-    AFRAME.registerComponent('spin-axis', {
-      schema: {
-        active: { type: 'boolean', default: true },
-        rate:   { type: 'number',  default: 0.35 },
-        axes:   { type: 'string',  default: 'y'  }
-      },
-      init() { this.ang = { x:0, y:0, z:0 }; },
-      tick(_, dt) {
-        if (!this.data.active) return;
-        const d = (dt / 1000) * this.data.rate;
-        const ax = this.data.axes;
-        if (ax.includes('x')) this.ang.x += d;
-        if (ax.includes('y')) this.ang.y += d;
-        if (ax.includes('z')) this.ang.z += d;
-        this.el.object3D.rotation.set(this.ang.x, this.ang.y, this.ang.z);
-      }
-    });
-
-  });
-  </script>
-</head>
-
-<body>
-
-  <div id="top-strip">
-    <div class="title-block">
-      <div class="big-title">GROSS TOPOLOGY MESH</div>
-      <div class="formula-tag">Z = <span>S³/3 − T²/2</span></div>
-    </div>
-    <div id="state-pill">
-      <div id="state-dot"></div>
-      <span id="state-text">SCANNING</span>
-    </div>
+  <div class="p-header">
+    <h2>Gross topology mesh — AR surface</h2>
+    <p>Z = S³/3 − T²/2 · AR marker tracking · WebGL mesh renderer</p>
   </div>
 
-  <div id="side-ticker">
-    <span class="live">LIVE</span>
-    <span>AR</span>
-    <span>3D</span>
-    <span>MESH</span>
-  </div>
+  <div class="p-body">
 
-  <div class="corner tl"></div>
-  <div class="corner tr"></div>
-
-  <a-scene embedded vr-mode-ui="enabled: false;"
-    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-    style="position:absolute;top:48px;left:36px;right:0;bottom:130px;">
-
-    <a-light type="ambient"     color="#ffffff"  intensity="0.5"></a-light>
-    <a-light type="directional" position="2 3 1" color="#e8f8c0" intensity="1.0"></a-light>
-    <a-light type="point"       position="-1 1 -2" color="#00aaff" intensity="0.35"></a-light>
-
-    <a-marker type="pattern" preset="custom"
-              url="./markers/pattern-Gross-TopologyMesh.patt"
-              id="marker">
-
-      <a-entity id="surf"
-        position="0 0.15 0"
-        scale="0.55 0.55 0.55"
-        shoe-surface="sMin:-1.4; sMax:1.4; tMin:-1.0; tMax:1.0; sSegs:60; tSegs:60; zScale:0.6; color:#c8f000; wireframe:false"
-        spin-axis="active:true; rate:0.35; axes:y">
-      </a-entity>
-
-    </a-marker>
-    <a-entity camera></a-entity>
-  </a-scene>
-
-  <div id="bottom-panel">
-    <div id="btn-grid">
-
-      <div class="ctrl-cell">
-        <div class="ctrl-label">render</div>
-        <button class="ctrl-btn" id="btn-wire">WIREFRAME</button>
-      </div>
-
-      <div class="ctrl-cell">
-        <div class="ctrl-label">palette</div>
-        <button class="ctrl-btn" id="btn-color">ACID GREEN</button>
-      </div>
-
-      <div class="ctrl-cell">
-        <div class="ctrl-label">rotation</div>
-        <button class="ctrl-btn on" id="btn-axes">AXIS — Y</button>
-      </div>
-
-      <div class="ctrl-cell">
-        <div class="ctrl-label">scale</div>
-        <button class="ctrl-btn" id="btn-size">SIZE — M</button>
-      </div>
-
-      <div class="ctrl-cell">
-        <div class="ctrl-label">velocity</div>
-        <button class="ctrl-btn on" id="btn-speed">RATE 0.35</button>
-      </div>
-
-      <div class="ctrl-cell">
-        <div class="ctrl-label">density</div>
-        <button class="ctrl-btn" id="btn-detail">MESH — M</button>
-      </div>
-
-    </div>
-
-    <div id="readout">
-      <div class="readout-row">
-        <span class="readout-key">SEGS</span>
-        <span class="readout-val hi" id="ro-segs">60</span>
-      </div>
-      <div class="readout-row">
-        <span class="readout-key">RATE</span>
-        <span class="readout-val" id="ro-rate">0.35</span>
-      </div>
-      <div class="readout-row">
-        <span class="readout-key">AXIS</span>
-        <span class="readout-val" id="ro-axis">Y</span>
-      </div>
-      <div class="readout-row">
-        <span class="readout-key">SCALE</span>
-        <span class="readout-val" id="ro-scale">0.55</span>
-      </div>
-      <div class="readout-row">
-        <span class="readout-key">MODE</span>
-        <span class="readout-val" id="ro-mode">SOLID</span>
+    <div class="p-canvas-wrap">
+      <div class="p-canvas-inner">
+        <span class="p-canvas-label">AR scene — webcam</span>
+        <span class="p-canvas-ph">[ AR render ]</span>
+        <span class="p-canvas-grab">Marker required</span>
       </div>
     </div>
+
+    <div class="p-panel">
+      <div class="p-panel-header">
+        <div class="p-icon">
+          <i class="ti ti-current-location" style="font-size:20px" aria-hidden="true"></i>
+        </div>
+        <div>
+          <div class="p-title">Marker tracking</div>
+          <div class="p-subtitle">AR.js · Hiro pattern · Live camera</div>
+        </div>
+        <div class="p-status-badge">
+          <span class="p-dot" id="arDot"></span>
+          <span id="arStatus">Scanning</span>
+        </div>
+      </div>
+
+      <div class="p-btn-grid">
+        <div class="p-ctrl-cell">
+          <div class="p-ctrl-label">Render</div>
+          <button class="p-ctrl-btn" id="btn-wire" onclick="toggleWire(this)">
+            <span>Wireframe</span><span class="p-ctrl-btn-arr">▶</span>
+          </button>
+        </div>
+        <div class="p-ctrl-cell">
+          <div class="p-ctrl-label">Palette</div>
+          <button class="p-ctrl-btn" id="btn-color" onclick="cycleColor(this)">
+            <span>Acid green</span><span class="p-ctrl-btn-arr">▶</span>
+          </button>
+        </div>
+        <div class="p-ctrl-cell">
+          <div class="p-ctrl-label">Rotation</div>
+          <button class="p-ctrl-btn on" id="btn-axes" onclick="cycleAxes(this)">
+            <span>Axis — Y</span><span class="p-ctrl-btn-arr">▶</span>
+          </button>
+        </div>
+        <div class="p-ctrl-cell">
+          <div class="p-ctrl-label">Scale</div>
+          <button class="p-ctrl-btn" id="btn-size" onclick="cycleSize(this)">
+            <span>Size — M</span><span class="p-ctrl-btn-arr">▶</span>
+          </button>
+        </div>
+        <div class="p-ctrl-cell">
+          <div class="p-ctrl-label">Velocity</div>
+          <button class="p-ctrl-btn on" id="btn-speed" onclick="cycleSpeed(this)">
+            <span>Rate 0.35</span><span class="p-ctrl-btn-arr">▶</span>
+          </button>
+        </div>
+        <div class="p-ctrl-cell">
+          <div class="p-ctrl-label">Density</div>
+          <button class="p-ctrl-btn" id="btn-detail" onclick="cycleDetail(this)">
+            <span>Mesh — M</span><span class="p-ctrl-btn-arr">▶</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-readout" style="margin-top:14px;border-radius:10px;">
+        <div class="p-readout-item"><span class="p-readout-key">Segs</span><span class="p-readout-val hi" id="ro-segs">60</span></div>
+        <div class="p-readout-item"><span class="p-readout-key">Rate</span><span class="p-readout-val" id="ro-rate">0.35</span></div>
+        <div class="p-readout-item"><span class="p-readout-key">Axis</span><span class="p-readout-val" id="ro-axis">Y</span></div>
+        <div class="p-readout-item"><span class="p-readout-key">Scale</span><span class="p-readout-val" id="ro-scale">0.55</span></div>
+        <div class="p-readout-item"><span class="p-readout-key">Mode</span><span class="p-readout-val" id="ro-mode">Solid</span></div>
+      </div>
+    </div>
+
+    <div class="p-panel">
+      <div class="p-panel-header">
+        <div class="p-icon">
+          <i class="ti ti-adjustments-horizontal" style="font-size:20px" aria-hidden="true"></i>
+        </div>
+        <div>
+          <div class="p-title">Mesh parameters</div>
+          <div class="p-subtitle">Surface domain · Z scale · Segment density</div>
+        </div>
+      </div>
+
+      <div class="p-slider-row">
+        <span class="p-slider-label">Z scale</span>
+        <input type="range" min="0.1" max="1.5" step="0.1" value="0.6" oninput="document.getElementById('v-zs').textContent=parseFloat(this.value).toFixed(1)">
+        <span class="p-slider-val" id="v-zs">0.6</span>
+      </div>
+      <div class="p-slider-row">
+        <span class="p-slider-label">S range (±)</span>
+        <input type="range" min="0.5" max="2.5" step="0.1" value="1.4" oninput="document.getElementById('v-sr').textContent=parseFloat(this.value).toFixed(1)">
+        <span class="p-slider-val" id="v-sr">1.4</span>
+      </div>
+      <div class="p-slider-row">
+        <span class="p-slider-label">T range (±)</span>
+        <input type="range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('v-tr').textContent=parseFloat(this.value).toFixed(1)">
+        <span class="p-slider-val" id="v-tr">1.0</span>
+      </div>
+      <div class="p-slider-row" style="margin-bottom:0">
+        <span class="p-slider-label">Spin rate</span>
+        <input type="range" min="0" max="1.5" step="0.05" value="0.35" oninput="document.getElementById('v-spin').textContent=parseFloat(this.value).toFixed(2);document.getElementById('ro-rate').textContent=parseFloat(this.value).toFixed(2)">
+        <span class="p-slider-val" id="v-spin">0.35</span>
+      </div>
+    </div>
+
   </div>
+</div>
 
-  <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const marker = document.getElementById('marker');
-    const surf   = document.getElementById('surf');
-    const dot    = document.getElementById('state-dot');
-    const txt    = document.getElementById('state-text');
+<script>
+  const palette = [
+    {l:'Acid green'},{l:'Signal red'},{l:'Ice blue'},{l:'Magma'},{l:'Ghost'},{l:'Ultraviolet'}
+  ];
+  const axList  = [{k:'y',l:'Y'},{k:'x',l:'X'},{k:'z',l:'Z'},{k:'xy',l:'XY'},{k:'xyz',l:'XYZ'}];
+  const sizes   = [{l:'M',v:'0.55'},{l:'S',v:'0.35'},{l:'L',v:'0.75'},{l:'XL',v:'1.00'}];
+  const speeds  = [{r:0.35,l:'0.35'},{r:0.10,l:'0.10'},{r:0.70,l:'0.70'},{r:1.20,l:'1.20'},{r:0,l:'Stop'}];
+  const details = [{s:60,l:'M'},{s:25,l:'Lo'},{s:100,l:'Hi'}];
+  let wi=0,ci=0,ai=0,si=0,spi=0,di=0,wire=false;
 
-    marker.addEventListener('markerFound', () => {
-      dot.className='found'; txt.className='found'; txt.textContent='LOCKED';
-    });
-    marker.addEventListener('markerLost', () => {
-      dot.className='lost'; txt.className='lost'; txt.textContent='LOST';
-    });
+  function toggleWire(b){
+    wire=!wire;
+    b.querySelector('span').textContent=wire?'Solid':'Wireframe';
+    b.classList.toggle('on',wire);
+    document.getElementById('ro-mode').textContent=wire?'Wire':'Solid';
+  }
+  function cycleColor(b){
+    ci=(ci+1)%palette.length;
+    b.querySelector('span').textContent=palette[ci].l;
+  }
+  function cycleAxes(b){
+    ai=(ai+1)%axList.length;
+    b.querySelector('span').textContent='Axis — '+axList[ai].l;
+    document.getElementById('ro-axis').textContent=axList[ai].l;
+  }
+  function cycleSize(b){
+    si=(si+1)%sizes.length;
+    b.querySelector('span').textContent='Size — '+sizes[si].l;
+    document.getElementById('ro-scale').textContent=sizes[si].v;
+  }
+  function cycleSpeed(b){
+    spi=(spi+1)%speeds.length;
+    const sp=speeds[spi];
+    b.querySelector('span').textContent='Rate '+sp.l;
+    b.classList.toggle('on',sp.r>0);
+    document.getElementById('ro-rate').textContent=sp.l;
+  }
+  function cycleDetail(b){
+    di=(di+1)%details.length;
+    b.querySelector('span').textContent='Mesh — '+details[di].l;
+    document.getElementById('ro-segs').textContent=details[di].s;
+  }
 
-    let wire=false, colorIdx=0, axIdx=0, sizeIdx=0, speedIdx=0, detailIdx=0;
-
-    const palette = [
-      { label:'ACID GREEN',   hex:'#c8f000' },
-      { label:'SIGNAL RED',   hex:'#ff2200' },
-      { label:'ICE BLUE',     hex:'#00cfff' },
-      { label:'MAGMA',        hex:'#ff6600' },
-      { label:'GHOST',        hex:'#e0e0e0' },
-      { label:'ULTRAVIOLET',  hex:'#9900ff' },
-    ];
-
-    const axList = [
-      {k:'y',l:'Y'},{k:'x',l:'X'},{k:'z',l:'Z'},
-      {k:'xy',l:'XY'},{k:'xz',l:'XZ'},{k:'yz',l:'YZ'},{k:'xyz',l:'XYZ'},
-    ];
-
-    const sizes = [
-      {s:'0.55 0.55 0.55',l:'M', v:'0.55'},
-      {s:'0.35 0.35 0.35',l:'S', v:'0.35'},
-      {s:'0.75 0.75 0.75',l:'L', v:'0.75'},
-      {s:'1.0 1.0 1.0',  l:'XL',v:'1.00'},
-    ];
-
-    const speeds = [
-      {r:0.35,l:'0.35'},{r:0.10,l:'0.10'},
-      {r:0.70,l:'0.70'},{r:1.20,l:'1.20'},{r:0,l:'STOP'},
-    ];
-
-    const details = [
-      {segs:60,l:'M'},{segs:25,l:'Lo'},{segs:100,l:'Hi'},
-    ];
-
-    const ro = id => document.getElementById(id);
-
-    document.getElementById('btn-wire').addEventListener('click', function () {
-      wire = !wire;
-      surf.setAttribute('shoe-surface','wireframe',wire);
-      this.textContent = wire ? 'SOLID' : 'WIREFRAME';
-      this.classList.toggle('on', wire);
-      ro('ro-mode').textContent = wire ? 'WIRE' : 'SOLID';
-    });
-
-    document.getElementById('btn-color').addEventListener('click', function () {
-      colorIdx = (colorIdx+1) % palette.length;
-      surf.setAttribute('shoe-surface','color',palette[colorIdx].hex);
-      this.textContent = palette[colorIdx].label;
-    });
-
-    document.getElementById('btn-axes').addEventListener('click', function () {
-      axIdx = (axIdx+1) % axList.length;
-      surf.setAttribute('spin-axis','axes',axList[axIdx].k);
-      this.textContent = 'AXIS — '+axList[axIdx].l;
-      ro('ro-axis').textContent = axList[axIdx].l;
-    });
-
-    document.getElementById('btn-size').addEventListener('click', function () {
-      sizeIdx = (sizeIdx+1) % sizes.length;
-      surf.setAttribute('scale',sizes[sizeIdx].s);
-      this.textContent = 'SIZE — '+sizes[sizeIdx].l;
-      ro('ro-scale').textContent = sizes[sizeIdx].v;
-    });
-
-    document.getElementById('btn-speed').addEventListener('click', function () {
-      speedIdx = (speedIdx+1) % speeds.length;
-      const sp = speeds[speedIdx];
-      if (sp.r===0) {
-        surf.setAttribute('spin-axis','active',false);
-        this.classList.remove('on');
-      } else {
-        surf.setAttribute('spin-axis','active',true);
-        surf.setAttribute('spin-axis','rate',sp.r);
-        this.classList.add('on');
-      }
-      this.textContent = 'RATE '+sp.l;
-      ro('ro-rate').textContent = sp.l;
-    });
-
-    document.getElementById('btn-detail').addEventListener('click', function () {
-      detailIdx = (detailIdx+1) % details.length;
-      const d = details[detailIdx];
-      surf.setAttribute('shoe-surface','sSegs',d.segs);
-      surf.setAttribute('shoe-surface','tSegs',d.segs);
-      this.textContent = 'MESH — '+d.l;
-      ro('ro-segs').textContent = d.segs;
-    });
-  });
-  </script>
-
-</body>
-</html>
+  setTimeout(()=>{
+    const dot=document.getElementById('arDot');
+    const txt=document.getElementById('arStatus');
+    dot.className='p-dot connecting';
+    txt.textContent='Scanning...';
+    setTimeout(()=>{
+      dot.className='p-dot connected';
+      txt.textContent='Locked';
+      txt.style.color='#22c55e';
+    },1800);
+  },600);
+</script>
