@@ -90,21 +90,19 @@
 
     AFRAME.registerComponent('toroidal-surface', {
       schema: {
-        R:          { type: 'number',  default: 0.55  }, // major radius
-        r:          { type: 'number',  default: 0.28  }, // minor radius (tube)
-        amplitude:  { type: 'number',  default: 0.18  }, // z-pinch amplitude
-        frequency:  { type: 'number',  default: 2     }, // pinch cycles around φ
-        uSegs:      { type: 'number',  default: 80    }, // φ segments
-        vSegs:      { type: 'number',  default: 48    }, // θ segments
-        color:      { type: 'color',   default: '#ff7a30' },
-        wireframe:  { type: 'boolean', default: false }
+        R:         { type: 'number',  default: 0.55 }, // major radius
+        r:         { type: 'number',  default: 0.35 }, // minor radius (tube)
+        uSegs:     { type: 'number',  default: 80   }, // u segments (around torus)
+        vSegs:     { type: 'number',  default: 48   }, // v segments (around tube)
+        color:     { type: 'color',   default: '#ff7a30' },
+        wireframe: { type: 'boolean', default: false }
       },
 
       init()  { this.build(); },
 
       update(old) {
         const d = this.data;
-        const keys = ['R','r','amplitude','frequency','uSegs','vSegs'];
+        const keys = ['R', 'r', 'uSegs', 'vSegs'];
         if (keys.some(k => old[k] !== d[k])) {
           this.el.removeObject3D('mesh');
           this.build();
@@ -115,22 +113,30 @@
       },
 
       build() {
-        const { R, r, amplitude, frequency, uSegs, vSegs } = this.data;
+        const { R, r, uSegs, vSegs } = this.data;
         const geo = new THREE.BufferGeometry();
         const verts = [], idx = [], cols = vSegs + 1;
 
         for (let ui = 0; ui <= uSegs; ui++) {
-          const phi = (ui / uSegs) * 2 * Math.PI;          // around torus
-          const pinch = 1 - amplitude * Math.abs(Math.cos(frequency * phi));
+          const u = (ui / uSegs) * 2 * Math.PI;
+          const cos3v_factor = Math.cos(u); // reused below
 
           for (let vi = 0; vi <= vSegs; vi++) {
-            const theta = (vi / vSegs) * 2 * Math.PI;       // around tube
+            const v = (vi / vSegs) * 2 * Math.PI;
 
-            // Standard torus with radial pinch on minor radius
-            const rr = r * pinch;
-            const x = (R + rr * Math.cos(theta)) * Math.cos(phi);
-            const y = (R + rr * Math.cos(theta)) * Math.sin(phi);
-            const z = rr * Math.sin(theta);
+            const cosV = Math.cos(v);
+            const sinV = Math.sin(v);
+
+            // Astroidal torus parametric equations:
+            // x = (R + r * cos³(v)) * cos(u)
+            // y = (R + r * cos³(v)) * sin(u)
+            // z = r * sin³(v)
+            const cos3v = cosV * cosV * cosV;
+            const sin3v = sinV * sinV * sinV;
+
+            const x = (R + r * cos3v) * Math.cos(u);
+            const y = (R + r * cos3v) * Math.sin(u);
+            const z = r * sin3v;
 
             verts.push(x, y, z);
           }
@@ -141,9 +147,9 @@
             const a = ui * cols + vi;
             const b = a + 1;
             const c = a + cols;
-            const d2 = c + 1;
+            const d = c + 1;
             idx.push(a, b, c);
-            idx.push(b, d2, c);
+            idx.push(b, d, c);
           }
         }
 
@@ -224,7 +230,7 @@
       <a-entity id="torus"
         position="0 0.4 0"
         scale="0.9 0.9 0.9"
-        toroidal-surface="R:0.55; r:0.28; amplitude:0.18; frequency:2; uSegs:80; vSegs:48; color:#ff7a30; wireframe:false"
+        toroidal-surface="R:0.55; r:0.35; uSegs:80; vSegs:48; color:#ff7a30; wireframe:false"
         multi-axis-rotation="enabled:true; speed:0.4; mode:y">
       </a-entity>
 
